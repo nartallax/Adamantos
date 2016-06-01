@@ -1,0 +1,24 @@
+# Alias OBJ Model File
+# Exported from SketchUp, (c) 2000-2012 Trimble Navigation Limited
+# File units = meters
+
+mtllib test.mtl
+
+g Mesh1 Model
+
+usemtl FrontColor
+v 0 0 -0
+vt 0 0
+vn 0 -1 -0
+v 0 0 -1
+vt 0 39.3701
+v 1 0 -2
+vt -39.3701 78.7402
+v 2 0 -2
+vt -78.7402 78.7402
+v 2 0 -1
+vt -78.7402 39.3701
+v 1 0 -0
+vt -39.3701 0
+f 1/1/1 2/2/1 3/3/1 4/4/1 5/5/1 6/6/1 
+
