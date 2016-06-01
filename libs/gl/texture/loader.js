@@ -1,54 +1,62 @@
 aPackage('nart.gl.texture.loader', () => {
-	"use strict"
 	
-	var eachAsync = aRequire('nart.util.collections').eachAsync;
-
+	var defineClass = aRequire('nart.util.class').define,
+		TexturePacker = aRequire('nart.gl.texture.packer'),
+		Requester = aRequire('nart.net.http.requester.xhr'),
+		base64 = aRequire('nart.util.base64'),
+		eachAsync = aRequire('nart.util.collections').eachAsync,
+		
+		SimpleTexture = aRequire('nart.gl.texture.simple'),
+		AnimatedTexture = aRequire('nart.gl.texture.animated');
+	
+	var getBytes = (url, cb) => Requester.get(url, {}, res => cb(res.body), { resultInBuffer: true }),
+		readTextures = (bytes, gl) => {
+			var result = TexturePacker.unpack(bytes);
+			
+			Object.keys(result).forEach(k => {
+				var tex = result[k];
+				result[k] = tex.frames.length === 1? 
+					SimpleTexture(gl, tex.frames[0], tex.width, tex.height): 
+					AnimatedTexture(gl, tex.frames, tex.width, tex.height);
+			});
+			
+			return result;
+		};
+	
 	var TextureLoader = function(gl){
 		if(!(this instanceof TextureLoader)) return new TextureLoader(gl);
-	
+		
 		this.cache = {};
-		this.loadListeners = {};
 		this.gl = gl;
-	}
+		this.packs = [];
+	};
 	
 	TextureLoader.prototype = {
-		get: function(name, body){ 
-			this.cache[name]? 
-				body(this.cache[name]): 
-				this.loadListeners[name]?
-					(body && this.loadListeners[name].push(body)):
-					((body && (this.loadListeners[name] = []).push(body)), this.forceLoad(name))
-				
-			return this;
+		get: function(name){ 
+			if(!(name in this.cache)){
+				throw new Error('No texture defined: "' + name + '"');
+			}
+			return this.cache[name];
 		},
-		defineTexture: function(name, tex){
-			this.cache[name] = tex;
-			
-			(this.loadListeners[name] || []).forEach(l => l(tex));
-			delete this.loadListeners[name];
-			
-			return this;
+		downloadPack: function(url, cb){
+			Requester.get(url, {}, res => {
+				this.packs.push(res.body);
+				cb();
+			}, { resultInBuffer: true })
 		},
-		forceLoad: function(name){
-			throw new Error('Texture cache miss for "' + name + '"');
-			/*
-			var gl = this.gl;
-			var tex = gl.createTexture();
-			tex.image = new Image();
+		extractPacks: function(cb){
+			this.packs.forEach(p => {
+				var texs = readTextures(p, this.gl);
+				Object.keys(texs).forEach(name => this.cache[name] = texs[name]);
+			});
 			
-			tex.image.onload = () => this.defineTexture(path, tex.image, null, null, tex);
-
-			tex.image.src = path;
+			this.packs = [];
 			
-			return this;
-			*/
-		},
-		preloadAll: function(items, after){
-			eachAsync(items, (i, cb) => this.get(i, cb), after);
+			cb();
 			return this;
 		}
 	}
 	
-	return TextureLoader;
 	
+	return TextureLoader;
 });

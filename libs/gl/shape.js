@@ -8,10 +8,10 @@ aPackage('nart.gl.shape', () => {
 		return () => ++i
 	})();
 
-	var Shape = defineClass(function(data, gl){
-		if(!(this instanceof Shape)) return new Shape(data, gl);
+	var Shape = defineClass(function(data){
+		if(!(this instanceof Shape)) return new Shape(data);
 		
-		this.gl = gl || Shape.defaultGl;
+		this.gl = data.gl;
 		
 		this.x = data.x || 0;
 		this.y = data.y || 0;
@@ -21,14 +21,10 @@ aPackage('nart.gl.shape', () => {
 		this.rotY = data.rotY || 0;
 		this.rotZ = data.rotZ || 0;
 		
-		this.transparency = data.transparency || 1;
-		
 		this.id = getId();
 	}, {
-		clone: function(){ return new this.class(this, this.gl) },
+		clone: function(){ return new this.class(this) },
 	})
-	
-	Shape.defaultGl = null;
 	
 	return Shape;
 	

@@ -6,41 +6,34 @@ aPackage('nart.gl.shape.simple', () => {
 		clutil = aRequire('nart.util.class'),
 		glutil = aRequire('nart.gl.util');
 				
-	var SimpleShape = clutil.define(function(data, gl){					
-		if(!(this instanceof SimpleShape)) return new SimpleShape(data, gl);
+	var SimpleShape = clutil.define(function(data){					
+		if(!(this instanceof SimpleShape)) return new SimpleShape(data);
+		Shape.call(this, data); // all the basic properties
 		
-		Shape.call(this, data, gl); // all the basic properties
+		this.setHighlightColor(data.highlightColor)
 		
-		this.setShapeType(data.shapeType)
-			.setVertex(data.vertex)
-			.setVertexNormals(data.vertexNormals)
-			.setHighlightColor(data.highlightColor)
-			// TODO create engine fabric that will create shapes etc depending on settings, for example color/texture usage
-			//.setColor(data.color)
-			.setVertexIndex(data.vertexIndex)
-			.setTextureIndex(data.textureIndex)
-			.setTexture(data.texture)
-			.setTextureName(data.textureName)
+		if(data.primitives) {
+			this.primitives = data.primitives;
+		} else {
+			this.primitives = [];
+			if(data.vertex && data.vertexIndex && data.textureIndex && data.texture){
+				this.addPrimitive(data.vertex, data.vertexIndex, data.texture, data.textureIndex);
+			}
+		}
 	}, {
-		setVertex: function(b){ return this.vertex = (glutil.bufferOf(this.gl, b, 3, this.gl.ARRAY_BUFFER, Float32Array) || null), this },
-		// TODO: calculate normals from actual vertex data, it shouldnt be too hard
-		setVertexNormals: function(b){
-			return this.vertexNormals = (glutil.bufferOf(this.gl, b, 3, this.gl.ELEMENT_ARRAY_BUFFER, Float32Array) || null), this 
-			//return this.vertexNormals = b, this
+		setHighlightColor: function(d){ return this.highlightColor = d, this },
+		
+		getPrimitives: function(frameNum){ 
+			return this.primitives 
 		},
-		//setColor: function(b){ return this.color = (glutil.bufferOf(this.gl, b, 4, "ARRAY_BUFFER", Float32Array) || null), this },
-		setVertexIndex: function(b){ 
-			return this.vertexIndex = (glutil.bufferOf(this.gl, b, 1, this.gl.ELEMENT_ARRAY_BUFFER, Uint16Array) || null), this 
-		},
-		setTextureName: function(name, loader){ 
-			return (name && (loader || SimpleShape.getTextureLoader()).get(name, t => this.setTexture(t))), this 
-		},
-		setTexture: function(tex){ return this.texture = tex, this },
-		setTextureIndex: function(b){
-			return this.textureIndex = (glutil.bufferOf(this.gl, b, 2, this.gl.ARRAY_BUFFER, Float32Array) || null), this;
-		},
-		setShapeType: function(t){ return this.shapeType = ((t === null || t === undefined)? this.gl.TRIANGLES: t), this },
-		setHighlightColor: function(d){ return this.highlightColor = d, this }
+		
+		addPrimitive: function(vertex, vertexIndex, texture, textureIndex){ 
+			this.primitives.push({
+				vertex: glutil.bufferOf(this.gl, vertex, 3, this.gl.ARRAY_BUFFER, Float32Array), 
+				vertexIndex: glutil.bufferOf(this.gl, vertexIndex, 1, this.gl.ELEMENT_ARRAY_BUFFER, Uint16Array),
+				texture: texture, 
+				textureIndex: glutil.bufferOf(this.gl, textureIndex, 2, this.gl.ARRAY_BUFFER, Float32Array)}) 
+		}
 	}, Shape);
 	
 	SimpleShape.defaultTextureLoader = null;

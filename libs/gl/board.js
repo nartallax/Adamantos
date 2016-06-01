@@ -62,7 +62,7 @@ aPackage('nart.gl.board', () => {
 		drawChildrenWithProgram: function(s){
 			s.activate();
 			var c = this.children, m = this.modelViewMatrix, pm = this.projectionMatrix;
-			for(var i in c) s.draw(c[i], this);
+			for(var i in c) s.draw(this.ticksPassed, c[i], this);
 		},
 		clearWithProgram: function(p){
 		

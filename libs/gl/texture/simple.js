@@ -8,7 +8,7 @@ aPackage('nart.gl.texture.simple', () => {
 	}
 	
 	SimpleTexture.prototype = {
-		getFrame: function(){
+		getFrame: function(frameNum){
 			return this.texture;
 		},
 		
@@ -20,7 +20,6 @@ aPackage('nart.gl.texture.simple', () => {
 			
 			gl.bindTexture(gl.TEXTURE_2D, tex);
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-			//gl.pixelStorei(gl.UNPACK_ALIGNMENT, true);
 			gl.texImage2D(gl.TEXTURE_2D, 0, colorMode, w, h, 0, colorMode, gl.UNSIGNED_BYTE, bytes);
 			
 			// difference: stretching vs pixelization

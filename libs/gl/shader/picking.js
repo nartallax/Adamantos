@@ -14,9 +14,6 @@ aPackage('nart.gl.shader.picking', () => {
 
 		this.setFramebuffer(this.fb);
 		gl.bindFramebuffer(gl.FRAMEBUFFER, this.fb);
-		//this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT | this.gl.STENCIL_BUFFER_BIT);
-		
-		//this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 		mat4.identity(b.modelViewMatrix);
 		
 		gl.bindTexture(gl.TEXTURE_2D, this.rttTexture);
@@ -37,7 +34,7 @@ aPackage('nart.gl.shader.picking', () => {
 		this.projectionMatrix.set(b.projectionMatrix)
 	}
 	
-	var drawWithMatrix = (t, s, m) => {
+	var drawWithMatrix = (frameNumber, t, s, m) => {
 		t.withTranslatedMatrix(t.viewMatrix, m, s, m => {
 			if(s.childShapes){
 				var c = s.childShapes;
@@ -62,8 +59,8 @@ aPackage('nart.gl.shader.picking', () => {
 		})
 	}
 	
-	var draw = function(s, b){ 
-		return drawWithMatrix(this, s, b.modelViewMatrix)
+	var draw = function(frameNumber, s, b){ 
+		return drawWithMatrix(frameNumber, this, s, b.modelViewMatrix)
 	}
 	
 	return gl => new ShaderPack(gl, `

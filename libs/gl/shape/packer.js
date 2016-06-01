@@ -3,41 +3,37 @@ aPackage('nart.gl.shape.packer', () => {
 	var ObjReader = aRequire('nart.gl.format.obj.reader'),
 		utf8 = aRequire('nart.util.utf8');
 
-	var Packer = function(modelName){
+	var Packer = function(){
 		if(!(this instanceof Packer)) return new Packer();
 		
-		this.triangles = [];
-		this.modelName = modelName;
+		this.models = {};
 		this.nameResolver = s => s;
 	}
 	
 	Packer.prototype = {
-		addTriangle: function(tr){ 
-			this.triangles.push(tr);
-			return this;
+		addObj: function(path, name, cb){
+			ObjReader.readWithTexturePaths(path, triangles => ((this.models[name] = triangles), cb()))
 		},
-		addTriangles: function(tr){
-			Array.isArray(tr)? tr.forEach(tr => this.addTriangle(tr)): this.addTriangle(tr);
-			return this;
-		},
-		addObj: function(path, cb){
-			ObjReader.readWithTexturePaths(path, triangles => (this.addTriangles(triangles), cb()))
-			return this;
-		},
-		addObject: function(obj){
+		addObject: function(name, obj){
+			var triangles = [];
+			
 			for(var i = 0; i < obj.textures.length; i++){
 				var texName = obj.textures[i];
 				var shape = obj.shapes[i];
 				for(var j = 0; j < shape.vertex.length; j++){
-					this.addTriangle({vertex: shape.vertex[j], texture: shape.texture[j], textureName: texName});
+					triangles.push({vertex: shape.vertex[j], texture: shape.texture[j], textureName: texName});
 				}
 			}
 			
-			return this;
+			this.models[name] = triangles;
 		},
 		
-		addPacked: function(bytes){
-			var pos = 0;
+		addObjects: function(objMap){
+			Object.keys(objMap).forEach(name => this.addObject(name, objMap[name]));
+		},
+		
+		addPacked: function(bytes, pos){
+			pos = pos || 0;
 			
 			var readByte = () => bytes[pos++],
 				readShort = () => (readByte() << 8) | readByte(),
@@ -93,50 +89,61 @@ aPackage('nart.gl.shape.packer', () => {
 					return result;
 				};
 				
-			this.modelName = readString();
+			var modelName = readString();
 			
 			var vXBound = readBounds(), vYBound = readBounds(), vZBound = readBounds(),
 				tXBound = readBounds(), tYBound = readBounds(),
 				
 				texCount = readShort();
-				
+			
+			var triangles = [];
+			
 			while(texCount--> 0){
 				var texName = readString();
 				var triCount = readShort();
 				while(triCount--> 0){
-					this.addTriangle(readTriangle(texName));
+					triangles.push(readTriangle(texName));
 				}
 			}
 			
-			return this;
+			this.models[modelName] = triangles;
+			
+			return pos;
 		},
 		
-		getUniqFieldValues: function(name){
+		addPackeds: function(bytes){
+			var pos = 0;
+			while(pos < bytes.byteLength){
+				pos = addPacked(bytes, pos);
+			}
+		},
+		
+		getUniqFieldValues: function(triangles, name){
 			var vals = {};
-			this.triangles.forEach(t => vals[t[name]] = true);
+			triangles.forEach(t => vals[t[name]] = true);
 			return Object.keys(vals).sort();
 		},
 		
-		getTexturePaths: function(){ return this.getUniqFieldValues('texturePath') },
-		getTextureNames: function(){ return this.getUniqFieldValues('textureName') },
+		getTexturePaths: function(triangles){ return this.getUniqFieldValues(triangles, 'texturePath') },
+		getTextureNames: function(triangles){ return this.getUniqFieldValues(triangles, 'textureName') },
 		
 		setNameResolver: function(res){
 			this.nameResolver = res;
 			return this;
 		},
 		
-		resolveTextureNames: function(){
-			this.triangles.forEach(t => t.textureName = t.textureName || this.nameResolver(t.texturePath));
-			return this;
+		resolveTextureNames: function(triangles){
+			triangles.forEach(t => t.textureName = t.textureName || this.nameResolver(t.texturePath));
+			return triangles;
 		},
 		
-		getSimpleModelTriangles: function(){
+		getSimpleModelTriangles: function(triangles){
 			var result = [];
 			
-			this.getTextureNames().forEach(tex => {
+			this.getTextureNames(triangles).forEach(tex => {
 				var v = [], t = [];
 				
-				this.triangles
+				triangles
 					.filter(tr => tr.textureName === tex)
 					.forEach(tr => {
 						v.push(tr.vertex);
@@ -148,12 +155,18 @@ aPackage('nart.gl.shape.packer', () => {
 			return result;
 		},
 	
-		getObject: function(){
-			this.resolveTextureNames();
+		getObjectByName: function(name){
+			var triangles = this.resolveTextureNames(this.models[name]);
 			return {
-				textures: this.getTextureNames(),
-				shapes: this.getSimpleModelTriangles()
+				textures: this.getTextureNames(triangles),
+				shapes: this.getSimpleModelTriangles(triangles)
 			};
+		},
+		
+		getObjects: function(){
+			var result = {};
+			Object.keys(this.models).map(name => result[name] = this.getObjectByName(name));
+			return result;
 		},
 		
 		// shape format (see below for explaination on coordinates):
@@ -185,19 +198,21 @@ aPackage('nart.gl.shape.packer', () => {
 		//		divided by (biggest - lowest) coordinate value for the shape
 		//		multiplied by 0xffff 
 		//		converted to 2-byte unsigned integer
-		getPacked: function(){
-			var object = this.getObject(),
+		getPackedByName: function(name){
+			var triangles = this.models[name],
+				object = this.getObjectByName(name),
 				
-				vXBounds = this.getMinMax('vertex', 0),
-				vYBounds = this.getMinMax('vertex', 1),
-				vZBounds = this.getMinMax('vertex', 2),
-				tXBounds = this.getMinMax('texture', 0),
-				tYBounds = this.getMinMax('texture', 1),
 				
-				resultSize = (8 * 5) + 2 + Buffer.byteLength(this.modelName, 'utf8') + 2// "header"
+				vXBounds = this.getMinMax(triangles, 'vertex', 0),
+				vYBounds = this.getMinMax(triangles, 'vertex', 1),
+				vZBounds = this.getMinMax(triangles, 'vertex', 2),
+				tXBounds = this.getMinMax(triangles, 'texture', 0),
+				tYBounds = this.getMinMax(triangles, 'texture', 1),
+				
+				resultSize = (8 * 5) + 2 + Buffer.byteLength(name, 'utf8') + 2// "header"
 					+ object.textures.map(t => Buffer.byteLength(t, "utf8") + 2).reduce((a, b) => a + b, 0) // names
 					+ (object.textures.length * 2) // triangle count
-					+ (this.triangles.length * 2 * 5 * 3), // triangles
+					+ (triangles.length * 2 * 5 * 3), // triangles
 				
 				result = Buffer.allocUnsafe(resultSize),
 				pos = 0;
@@ -231,7 +246,7 @@ aPackage('nart.gl.shape.packer', () => {
 					putShort(v)
 				};
 				
-			putString(this.modelName);
+			putString(name);
 			[vXBounds, vYBounds, vZBounds, tXBounds, tYBounds].forEach(putBoundsAndGet);
 			putShort(object.textures.length);
 			
@@ -258,13 +273,17 @@ aPackage('nart.gl.shape.packer', () => {
 			return result;
 		},
 		
-		getMinMax: function(fieldName, index){
-			if(this.triangles.length < 0) return null;
+		getPackeds: function(){
+			return Buffer.concat(Object.keys(this.models).map(name => this.getPackedByName(name)));
+		},
+		
+		getMinMax: function(triangles, fieldName, index){
+			if(triangles.length < 0) return null;
 			
 			var max, min;
-			max = min = this.triangles[0][fieldName][0][index];
+			max = min = triangles[0][fieldName][0][index];
 			
-			this.triangles.forEach(tr => tr[fieldName].forEach(fval => {
+			triangles.forEach(tr => tr[fieldName].forEach(fval => {
 				var v = fval[index];
 				(v > max) && (max = v);
 				(v < min) && (min = v);

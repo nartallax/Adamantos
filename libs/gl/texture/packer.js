@@ -11,13 +11,12 @@ aPackage('nart.gl.texture.packer', () => {
 		eachAsync = aRequire('nart.util.collections').eachAsync,
 		Path = aRequire.node('path'),
 		fs = aRequire.node('fs'),
+		splitPath = aRequire('nart.util.fs').splitPath,
 		err = aRequire('nart.util.err'),
 		getPixels = aRequire.node('get-pixels'),
 		utf8 = aRequire('nart.util.utf8'),
-		zlib = aRequire.node('zlib');
+		Packer = aRequire('nart.gl.resource.packer');
 
-		// this also purifies path, removing redundant elements
-	var splitPath = path => Path.join.apply(Path, path.split(Path.sep)).split(Path.sep);
 	var getFrameCount = ndarr => ndarr.shape.length === 3? 1: ndarr.shape[0];
 	var getFrameSize = ndarr => {
 		var off = ndarr.shape.length - 3;
@@ -49,13 +48,14 @@ aPackage('nart.gl.texture.packer', () => {
 		return result;
 	}
 		
-	var Packer = function(separator){
-		if(!(this instanceof Packer)) return new Packer();
+	var TexturePacker = function(){
+		if(!(this instanceof TexturePacker)) return new TexturePacker();
 		this.buffers = [];
-		this.separator = separator || '.';
 	}
 	
-	Packer.unpack = bytes => {
+	TexturePacker.prototype = new Packer();
+	
+	TexturePacker.unpack = bytes => {
 		
 		var off = 0,
 			len = bytes.byteLength,
@@ -94,113 +94,41 @@ aPackage('nart.gl.texture.packer', () => {
 		
 	}
 	
-	Packer.prototype = {
-		
-		addDirectories: function(dirPrefixMap, cb){
-			if(Array.isArray(dirPrefixMap)){
-				var map = {};
-				dirPrefixMap.forEach(k => map[k] = '');
-				dirPrefixMap = map;
-			}
+	TexturePacker.prototype.getAddeableFilesFilter = () => (/.+\.(jpe?g|gif|png)$/);
+	
+	TexturePacker.prototype.addBuffer = function(name, buffer, sourceFile){
+		getPixels(buffer, 'image/' + (sourceFile.match(/[^.]+$/) || [])[0], err(imageData => {
+			if(!imageData) return;
 			
-			eachAsync(Object.keys(dirPrefixMap), (dirPath, cb) => {
-				this.addDirectory(dirPath, dirPrefixMap[dirPath], cb);
-			}, cb);
+			var frameSize = getFrameSize(imageData),
+				frameCount = getFrameCount(imageData),
+				nameByteLen = Buffer.byteLength(name, "utf8"),
+				metaBuffer = Buffer.allocUnsafe(2 + 2 + 2 + 2 + nameByteLen),
 			
-			return this;
-		},
-		
-		addDirectory: function(directoryPath, prefix, cb){
-			if(!cb && typeof(prefix) === 'function'){
-				cb = prefix;
-				prefix = '';
-			}
+				i = 0,
+				putByte = val => metaBuffer.writeUInt8(val & 0xff, i++),
+				putShort = val => { putByte(val >>> 8), putByte(val) };
 			
-			var texPaths = [];
-				
-			eachFileRecursiveIn(directoryPath, path => texPaths.push(path), () => {
-				eachAsync(texPaths, (texPath, cb) => {
-					var name = this.texturePathToName(texPath, directoryPath, prefix);
-					if(!name) return cb();
-					
-					getPixels(texPath, err(imageData => {
-						if(!imageData) return;
-						
-						var frameSize = getFrameSize(imageData),
-							frameCount = getFrameCount(imageData),
-							nameByteLen = Buffer.byteLength(name, "utf8"),
-							metaBuffer = Buffer.allocUnsafe(2 + 2 + 2 + 2 + nameByteLen),
-						
-							i = 0,
-							putByte = val => metaBuffer.writeUInt8(val & 0xff, i++),
-							putShort = val => { putByte(val >>> 8), putByte(val) };
-						
-						putShort(nameByteLen);
-						putShort(frameCount);
-						putShort(frameSize.width);
-						putShort(frameSize.height);
-						metaBuffer.write(name, i, nameByteLen, 'utf8');
-						
-						var frameBufs = [];
-						for(var f = 0; f < frameCount; f++) frameBufs.push(frameToBuffer(imageData, f));
-						
-						//console.log('Wrote ' + name + ': ' + (metaBuffer.length + frameBufs.reduce((n, b) => n + b.length, 0)) + ' bytes')
-						
-						this.buffers.push(metaBuffer);
-						this.buffers = this.buffers.concat(frameBufs);
-						
-						cb();
-						
-					}));
-					
-				}, cb);
-			});
+			putShort(nameByteLen);
+			putShort(frameCount);
+			putShort(frameSize.width);
+			putShort(frameSize.height);
+			metaBuffer.write(name, i, nameByteLen, 'utf8');
 			
-			return this;
-		},
-		
-		isSupportedTexture: function(path){
-			return path.toLowerCase().match(/.+\.(jpe?g|gif|png)$/)? true: false;
-		},
-		
-		texturePathToName: function(texturePath, prefixPath, prefixName){
-			// limited set of image types supported
-			if(!this.isSupportedTexture(texturePath)) return null;
+			var frameBufs = [];
+			for(var f = 0; f < frameCount; f++) frameBufs.push(frameToBuffer(imageData, f));
 			
-			texturePath = texturePath.replace(/\.[^.]+$/, '');
+			//console.log('Wrote ' + name + ': ' + (metaBuffer.length + frameBufs.reduce((n, b) => n + b.length, 0)) + ' bytes')
 			
-			// no fake separators allowed
-			if(texturePath.indexOf(this.separator) > 0) return null;
-			
-			var parts = splitPath(texturePath);
-			
-			if(prefixPath) parts = parts.slice(splitPath(prefixPath).length);
-			prefixName = (prefixName || '').split(this.separator).filter(f => f);
-			
-			return prefixName.concat(parts).join(this.separator);
-		},
-		
-		getBuffer: function(cb){
-			cb(Buffer.concat(this.buffers));
-			return this;
-		},
-		
-		getGzippedBuffer: function(cb){
-			zlib.gzip(Buffer.concat(this.buffers), {
-				chunkSize: 16 * 1024,
-				memLevel: 9,
-				level: zlib.Z_BEST_COMPRESSION,
-				strategy: zlib.Z_FIXED
-			}, err(cb));
-			return this;
-		}
-		
-		
+			this.buffers.push(metaBuffer);
+			this.buffers = this.buffers.concat(frameBufs);
+		}));
 	};
+		
+	TexturePacker.prototype.getPackeds = function(cb){
+		return Buffer.concat(this.buffers);
+	}
 	
-	Packer.texturePathToName = Packer.pathToName = Packer.prototype.texturePathToName;
-	Packer.isSupportedTexture = Packer.prototype.isSupportedTexture;
-	
-	return Packer;
+	return TexturePacker;
 
 });

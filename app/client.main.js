@@ -3,8 +3,7 @@ aPackage('nart.adamantos.client.main', () => {
 	var log = aRequire('nart.util.log'),
 		Shape = aRequire('nart.gl.shape'),
 		SimpleShape = aRequire('nart.gl.shape.simple'),
-		//TextureLoader = aRequire('nart.gl.texture.loader'),
-		PackedTextureLoader = aRequire('nart.gl.texture.loader.packed'),
+		TextureLoader = aRequire('nart.gl.texture.loader'),
 		Board = aRequire('nart.gl.board');
 
 	var commonStyle = 'border: 0px; margin: 0px; padding: 0px; width: 100%; height: 100%; position: fixed; background: #ccc; overflow: hidden';
@@ -43,14 +42,12 @@ aPackage('nart.adamantos.client.main', () => {
 		var board = Board(createDisplay());
 		var gl = board.gl;
 		
-		Shape.defaultGl = gl;
-		
-		
 		var afterTexturesLoaded = () => {
 		
 			log('Preloaded');
 		
 			var cube = (() => SimpleShape({
+					gl: gl, 
 					vertex: (() => { return [
 						-1,	-1,	-1,
 						-1,	-1,	1,
@@ -111,7 +108,7 @@ aPackage('nart.adamantos.client.main', () => {
 						0, 1, 5
 					]})(), 
 					highlightColor: [0.15, 0.15, 0.15],
-					z: -10.0, rotX: 0.5, textureName: "crate"}))();
+					z: -10.0, rotX: 0.5, texture: texLoader.get("crate")}))();
 			/*
 			(() => SimpleShape({
 					vertex: (() => { return[
@@ -263,7 +260,7 @@ aPackage('nart.adamantos.client.main', () => {
 			if(true) setTimeout(() => {
 				console.log('stopping');
 				board.stop();
-			}, 90000);
+			}, 5000);
 			
 			board
 				//.addChild(cube)
@@ -276,11 +273,8 @@ aPackage('nart.adamantos.client.main', () => {
 		
 		}
 		
-		var texLoader = new PackedTextureLoader(gl);
+		var texLoader = new TextureLoader(gl);
 		
-		SimpleShape.defaultTextureLoader = texLoader;
-		
-		//texLoader.preloadTexturePack('/get_texture_pack', afterTexturesLoaded);
 		texLoader.downloadPack('/get_texture_pack', () => {
 			log("Downloaded texture pack, unpacking...")
 			texLoader.extractPacks(() => {
@@ -288,8 +282,6 @@ aPackage('nart.adamantos.client.main', () => {
 				afterTexturesLoaded();
 			});
 		});
-		
-		//SimpleShape.defaultTextureLoader = new TextureLoader(gl).preloadAll(["get_single_texture?crate.gif"], afterTexturesLoaded);
 	}
 
 });

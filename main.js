@@ -9,24 +9,37 @@ require("./libs/meta/addict.js")
 	.main(() => {
 		"use strict";
 		
-		var log = aRequire('nart.util.log'),
-			fs = aRequire.node('fs'),
+		var fs = aRequire.node('fs'),
+			zlib = aRequire.node('zlib'),
+			
+			log = aRequire('nart.util.log'),
+			err = aRequire('nart.util.err'),
+			
 			SocketServer = aRequire('nart.net.socket.server'),
 			JsonServer = aRequire('nart.net.http.server.json'),
 			HttpServer = aRequire('nart.net.http.server'),
+			
 			Client = aRequire('nart.net.socket.client.node'),
 			Messenger = aRequire('nart.net.message.messenger'),
 			config = aRequire('config'),
 			htmlAssembler = aRequire('nart.util.html.client'),
 			TexturePacker = aRequire('nart.gl.texture.packer');
+			
+		var gzipBuffer = function(buffer, cb){
+			zlib.gzip(buffer, {
+				chunkSize: 16 * 1024,
+				memLevel: 9,
+				level: zlib.Z_BEST_COMPRESSION,
+				strategy: zlib.Z_FIXED
+			}, err(cb));
+		};
 	
 		log("Server starting.");
 		
 		var html = (() => {
 			var client = new htmlAssembler()
 				.setTitle('Adamantos')
-				//.setFavicon('./favicon.png')
-				//.addFont('../fonts/opensans.woff', 'Open Sans')
+				.setFavicon('./textures/violet_gem.png')
 				.setMainPackage('nart.adamantos.client.main');
 				
 			var html = client.getHtml();
@@ -36,16 +49,10 @@ require("./libs/meta/addict.js")
 			return html
 		})();
 		
-		var texturePack = null,
-			compressedTexturePack = null;
+		var compressedTexturePack = null;
 		var texturePacker = new TexturePacker();
 		texturePacker.addDirectories({'./textures': ''}, () => {
-			 texturePacker
-				.getBuffer(pack => texturePack = pack)
-				.getGzippedBuffer(pack => {
-					log('Texture pack assembled.');
-					compressedTexturePack = pack;
-				});
+			 gzipBuffer(texturePacker.getPackeds(), pack => compressedTexturePack = pack);
 		})
 		
 		new SocketServer(config.server.socket.port, s => {
@@ -84,13 +91,12 @@ require("./libs/meta/addict.js")
 							});
 							res.write(compressedTexturePack);
 						} else {
-							res.writeHead(200, { 
-								'Content-Type': 'application/octet-stream', 
-								'Content-Length': texturePack.length
-							});
-							res.write(texturePack);
+							res.writeHead(500, { 'Content-Type': 'text/plain' });
+							res.write("Your browser do not support gzip compression.");
 						}
 						break;
+					case 'get_model_pack':
+						
 					default:
 						res.writeHead(200, { 'Content-Type': 'text/html' });
 						res.write(html);
