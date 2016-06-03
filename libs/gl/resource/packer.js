@@ -7,7 +7,6 @@ aPackage('nart.gl.resource.packer', () => {
 		fs = aRequire.node('fs'),
 		splitPath = aRequire('nart.util.fs').splitPath,
 		err = aRequire('nart.util.err'),
-		getPixels = aRequire.node('get-pixels'),
 		utf8 = aRequire('nart.util.utf8');
 
 		

@@ -18,11 +18,9 @@ aPackage('nart.gl.format.gif.reader', () => {
 		
 		var result = {width: reader.width, height: reader.height, frames: []};
 		
+		var frame = new Uint8Array(reader.width * reader.height * 4);
 		for(var frameNum = 0; frameNum < reader.frames.length; frameNum++){
-			var frame = new Uint8Array(reader.width * reader.height * 4);
-			
-			reader.decodeAndBlitFrameRGBA(reader.frames[frameNum], frame);
-			result.frames.push(frame);
+			result.frames.push(frame = reader.decodeAndBlitFrameRGBA(reader.frames[frameNum], frame));
 		}
 		
 		return result;
@@ -136,7 +134,7 @@ aPackage('nart.gl.format.gif.reader', () => {
 		reader.readByte(); // codesize, unused
 		reader.skipByteSizedBlocks();
 		
-		return {x: x, y: y, width: w, height: h,
+		return {x: x, y: y, width: w, height: h, totalWidth: params.width, totalHeight: params.height,
 				 palette_offset: paletteOffset,
 				 data_offset: dataOffset,
 				 transparent_index: params.transparentIndex,
@@ -313,13 +311,13 @@ aPackage('nart.gl.format.gif.reader', () => {
 		
 		//return {width: header.width, height: header.height, frames: frames};
 		
-		this.decodeAndBlitFrameRGBA = function(frame, pixels) {
+		this.decodeAndBlitFrameRGBA = function(frame, baseFrame) {
 			var num_pixels = frame.width * frame.height;
 			var index_stream = new Uint8Array(num_pixels);	// At most 8-bit indices.
+			var pixels = baseFrame.slice(0);//new Uint8Array(frame.totalWidth * frame.totalHeight * 4);
 			
 			decodeIndexStreamInto(new BufReader(buf, frame.data_offset), index_stream);
 			
-			//GifReaderLZWOutputIndexStream(buf, frame.data_offset, index_stream, num_pixels);
 			var palette_offset = frame.palette_offset;
 
 			// NOTE(deanm): It seems to be much faster to compare index to 256 than
@@ -377,6 +375,8 @@ aPackage('nart.gl.format.gif.reader', () => {
 				}
 				--xleft;
 			}
+			
+			return pixels;
 		};
 	}
 

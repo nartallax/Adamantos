@@ -13,8 +13,8 @@ aPackage('nart.gl.texture.packer', () => {
 		fs = aRequire.node('fs'),
 		splitPath = aRequire('nart.util.fs').splitPath,
 		err = aRequire('nart.util.err'),
-		getPixels = aRequire.node('get-pixels'),
 		utf8 = aRequire('nart.util.utf8'),
+		readGif = aRequire('nart.gl.format.gif.reader'),
 		Packer = aRequire('nart.gl.resource.packer');
 
 	var getFrameCount = ndarr => ndarr.shape.length === 3? 1: ndarr.shape[0];
@@ -94,12 +94,10 @@ aPackage('nart.gl.texture.packer', () => {
 		
 	}
 	
-	TexturePacker.prototype.getAddeableFilesFilter = () => (/.+\.(jpe?g|gif|png)$/);
+	TexturePacker.prototype.getAddeableFilesFilter = () => (/.+\.gif$/);
 	
 	TexturePacker.prototype.addBuffer = function(name, buffer, sourceFile){
-		getPixels(buffer, 'image/' + (sourceFile.match(/[^.]+$/) || [])[0], err(imageData => {
-			if(!imageData) return;
-			
+		readGif(buffer, data => {
 			var frameSize = getFrameSize(imageData),
 				frameCount = getFrameCount(imageData),
 				nameByteLen = Buffer.byteLength(name, "utf8"),
@@ -110,19 +108,19 @@ aPackage('nart.gl.texture.packer', () => {
 				putShort = val => { putByte(val >>> 8), putByte(val) };
 			
 			putShort(nameByteLen);
-			putShort(frameCount);
-			putShort(frameSize.width);
-			putShort(frameSize.height);
+			putShort(data.frames.length);
+			putShort(data.width);
+			putShort(data.height);
 			metaBuffer.write(name, i, nameByteLen, 'utf8');
 			
-			var frameBufs = [];
-			for(var f = 0; f < frameCount; f++) frameBufs.push(frameToBuffer(imageData, f));
+			
+			var frameBufs = data.frames.map(f => new Buffer(f));
 			
 			//console.log('Wrote ' + name + ': ' + (metaBuffer.length + frameBufs.reduce((n, b) => n + b.length, 0)) + ' bytes')
 			
 			this.buffers.push(metaBuffer);
 			this.buffers = this.buffers.concat(frameBufs);
-		}));
+		});
 	};
 		
 	TexturePacker.prototype.getPackeds = function(cb){

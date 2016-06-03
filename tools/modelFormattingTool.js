@@ -6,7 +6,7 @@ usage:
 	put OBJ into ../model_sources/na/me/space.obj (MTL and referenced texture files should be nearby)
 	launch the tool like 
 		node modelFormattingTool.js ../model_sources ../models ../textures na.me.space 	<-- this will 'format' only one model
-		node modelFormattingTool.js	../model_sources ../models ../textures				<-- this will 'format' everything inside source dir
+		node modelFormattingTool.js ../model_sources ../models ../textures				<-- this will 'format' everything inside source dir
 		
 	'format' = 'translate files to expected format (json) and move them and textures to corresponding locations (to ../models and ../textures)'
 */
@@ -18,8 +18,9 @@ require(__dirname + "/../libs/meta/addict.js")
 		"use strict";
 		
 		var launchTime = new Date().getTime();
+		var success = 0, total = 0;
 		var onWorkDone = () => {
-			console.log('Done in ' + ((new Date().getTime() - launchTime) / 1000).toFixed(2) + 's.');
+			console.log('Done in ' + ((new Date().getTime() - launchTime) / 1000).toFixed(2) + 's: ' + success + ' / ' + total);
 		}
 		
 		var Packer = aRequire('nart.gl.resource.packer'),
@@ -32,6 +33,7 @@ require(__dirname + "/../libs/meta/addict.js")
 			mkDir = aRequire('nart.util.fs').mkDir,
 			putFile = aRequire('nart.util.fs').putFile,
 			eachFileRecursiveIn = aRequire('nart.util.fs').eachFileRecursiveIn,
+			distinct = aRequire('nart.util.collections').distinct,
 			
 			path = aRequire.node('path'),
 			fs = aRequire.node('fs');
@@ -72,6 +74,7 @@ require(__dirname + "/../libs/meta/addict.js")
 			
 			packer.addObj(obj, objName, () => {
 				var modelJson = JSON.stringify(packer.getObjectByName(objName));
+				total++;
 				
 				if(texturePaths.length === 0) {
 					return cb(console.error('Will not process model ' + obj + ': it has no textures at all.'));
@@ -81,6 +84,13 @@ require(__dirname + "/../libs/meta/addict.js")
 				if(badTextures.length > 0){
 					return cb(console.error('Will not process model ' + obj + ': ' + badTextures.length + ' of its triangles have no texture.'));
 				}
+				
+				var unsupportedFormatTextures = distinct(texturePaths).filter(f => !f.toLowerCase().endsWith('.gif'));
+				if(unsupportedFormatTextures.length > 0){
+					return cb(console.error('Will not process model ' + obj + ': ' + unsupportedFormatTextures.length + ' texture images have wrong format (.gif file expected).'));
+				}
+				
+				success++;
 				
 				var counter = new Countdown(1, cb || (() => {}));
 				texturePaths.forEach(p => {
