@@ -1,23 +1,41 @@
 aPackage('nart.util.utf8', () => {
 
-	return {
-		strToBytes: str => {
-			var utf8 = [], i = -1, len = str.length, code;
+	var utf8 = {
+		byteLength: str => {
+			var res = 0, i = -1;
 			while(++i < len) {
 				code = str.charCodeAt(i);
-				if (code < 0x80)
-					utf8.push(code);
-				else if (code < 0x800)
-					utf8.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
-				else if (code < 0xd800 || code >= 0xe000)
-					utf8.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
-				else
-					utf8.push(0xef, 0xbf, 0xbd);
+				res += code < 0x80? 1: code < 0x800? 2: 3;
 			}
-			return utf8;
+			
+			return res;
+		}
+		
+		strToBytes: (str, res, start) => {
+			res = res || new Uint8Array(utf8.byteLength(str));
+			var i = -1, pos = start || 0, len = str.length, code;
+			while(++i < len) {
+				code = str.charCodeAt(i);
+				if (code < 0x80){
+					res[pos++] = code;
+				} else if (code < 0x800){
+					res[pos++] = 0xc0 | (code >> 6);
+					res[pos++] = 0x80 | (code & 0x3f);
+				} else if (code < 0xd800 || code >= 0xe000){
+					res[pos++] = 0xe0 | (code >> 12);
+					res[pos++] = 0x80 | ((code >> 6) & 0x3f);
+					res[pos++] = 0x80 | (code & 0x3f);
+				} else {
+					res[pos++] = 0xef;
+					res[pos++] = 0xbf;
+					res[pos++] = 0xbd;
+				}
+			}
+			return res;
 		},
-		bytesToStr: bytes => {
-			var result = '', i = 0, len = bytes.length, code;
+		
+		bytesToStr: (bytes, start, end) => {
+			var result = '', i = start || 0, len = end || bytes.length, code;
 			while(i < len) {
 				code = bytes[i];
 				if (code < 0x80) {
@@ -37,5 +55,7 @@ aPackage('nart.util.utf8', () => {
 			return result;
 		}
 	}
+	
+	return utf8;
 
 })

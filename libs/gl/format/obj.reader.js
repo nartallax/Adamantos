@@ -17,12 +17,12 @@ aPackage('nart.gl.format.obj.reader', () => {
 		readMaterialsOnly: (obj, cb) => {
 			var files = {}, mats = {};
 			
-			readLines(path, lines => {
+			readLines(obj, lines => {
 				lines.forEach(l => {
 					var p = l.replace(/(^\s+|\s+$)/g, '').split(/\s+/);
 					if(p.length < 1) return;
 					switch((p[0] || '').toLowerCase()){
-						case 'mtllib': return files[ObjReader.resolvePathByObj(path, p[1])] = true;
+						case 'mtllib': return files[ObjReader.resolvePathByObj(obj, p[1])] = true;
 						case 'usemtl': return mats[p[1]] = true;
 					}
 				});
@@ -37,10 +37,10 @@ aPackage('nart.gl.format.obj.reader', () => {
 					var matMap = {};
 					
 					matMaps.forEach(mmap => {
-						Object.keys(mmap).forEach(k => matMap[i] = ObjReader.resolvePathByObj(obj, mmap[i]));
+						Object.keys(mmap).forEach(i => matMap[i] = ObjReader.resolvePathByObj(obj, mmap[i]));
 					});
 					
-					cb(data.triangles);
+					cb(matMap);
 				});
 			});
 		}, 
@@ -52,7 +52,8 @@ aPackage('nart.gl.format.obj.reader', () => {
 					var p = l.split(/\s+/);
 					switch((p[0] || '').toLowerCase()){
 						case 'usemtl': return 'usemtl ' + matMap[p[1].replace(/(^\s+|\s+$)/g, '')];
-						case 'f': return 'f ' + p.slice(1).map(p => p.split(/\/\\/).slice(0, 2).join('/')).join(' ')
+						case 'f': 
+							return 'f ' + p.slice(1).map(p => p.split(/[\/\\]/).slice(0, 2).join('/')).join(' ')
 						default: return l;
 					}
 				}).join('\n'));

@@ -26,6 +26,7 @@ require(__dirname + "/../libs/meta/addict.js")
 		var Packer = aRequire('nart.gl.resource.packer'),
 			TexturePacker = aRequire('nart.gl.texture.packer'),
 			ShapePacker = aRequire('nart.gl.shape.packer'),
+			ObjReader = aRequire('nart.gl.format.obj.reader'),
 			
 			Countdown = aRequire('nart.util.countdown'),
 			
@@ -42,6 +43,8 @@ require(__dirname + "/../libs/meta/addict.js")
 			modelDir = process.argv[3],
 			textureDir = process.argv[4];
 
+		var pathToName = path => Packer.pathToName(path || '', sourceDir);
+			
 		if(!sourceDir || !modelDir || !textureDir) return console.error('Expected to have at least 3 arguments: source directory, model destination directory and texture destination directory.');
 			
 		var redundantPrefixLength = splitPath(sourceDir).length;
@@ -61,26 +64,15 @@ require(__dirname + "/../libs/meta/addict.js")
 		}
 		
 		var transferModel = (obj, cb) => {
-			var objName = Packer.pathToName(obj, sourceDir);
-			var texturePaths = [];			
-			
-			var packer = new ShapePacker();
-			
-			packer.setNameResolver(path => {
-				texturePaths.push(path);
-				var name = Packer.pathToName(path || '', sourceDir);
-				return name;
-			});
-			
-			packer.addObj(obj, objName, () => {
-				var modelJson = JSON.stringify(packer.getObjectByName(objName));
-				total++;
+			total++;
+			ObjReader.readMaterialsWithPaths(obj, matMap => {
+				var texturePaths = Object.keys(matMap).map(k => matMap[k]);
 				
 				if(texturePaths.length === 0) {
 					return cb(console.error('Will not process model ' + obj + ': it has no textures at all.'));
 				}
 				
-				var badTextures = texturePaths.filter(f => !f || typeof(f) !== 'string')
+				var badTextures = texturePaths.filter(f => !f || typeof(f) !== 'string');
 				if(badTextures.length > 0){
 					return cb(console.error('Will not process model ' + obj + ': ' + badTextures.length + ' of its triangles have no texture.'));
 				}
@@ -90,18 +82,24 @@ require(__dirname + "/../libs/meta/addict.js")
 					return cb(console.error('Will not process model ' + obj + ': ' + unsupportedFormatTextures.length + ' texture images have wrong format (.gif file expected).'));
 				}
 				
-				success++;
 				
-				var counter = new Countdown(1, cb || (() => {}));
+				var counter = new Countdown(1, () => (success++, cb && cb()));
+				
+				
 				texturePaths.forEach(p => {
 					counter.inc();
 					transferFile(p, sourceDir, textureDir, counter.dec);
 				});
 				
-				createAndGetDestinationPath(obj, sourceDir, modelDir, dest => {
-					putFile(dest.replace(/\.[Oo][Bb][Jj]$/, '.json'), modelJson, () => cb && cb());
-				});
 				
+				var matNameMap = {};
+				Object.keys(matMap).forEach(k => matNameMap[k] = pathToName(matMap[k]));
+				
+				ObjReader.getSimplifiedObj(obj, matNameMap, text => {
+					createAndGetDestinationPath(obj, sourceDir, modelDir, dest => {
+						putFile(dest, text, counter.dec);
+					});
+				});
 			});
 		};
 		
