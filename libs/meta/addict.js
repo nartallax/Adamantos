@@ -203,7 +203,7 @@ var Addict = (() => {
 		}
 		
 		var discoverPackage = name => {
-			switch(Addict.environment){
+			switch(Addict.realEnvironment){
 				case 'node': return Addict.require.node(fileOrThrow(name));
 				case 'browser': return; /* no autodiscovery for browsers */
 			}
@@ -295,6 +295,22 @@ var Addict = (() => {
 		})(),
 		fileOf: fileOfPackage
 	}
+	
+	var moduleByEnvironment = moduleEnvMap => Addict.require(moduleEnvMap[Addict.environment]);
+	
+	var withEnv = (env, body) => {
+		var oldEnv = Addict.environment;
+		Addict.environment = env;
+		
+		body();
+		
+		Addict.environment = oldEnv;
+	}
+	
+	Addict.moduleByEnvironment = moduleByEnvironment;
+	Addict.withEnvironment = withEnv;
+	
+	Addict.realEnvironment = Addict.environment;
 	
 	return Addict;
 	

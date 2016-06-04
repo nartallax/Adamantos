@@ -274,12 +274,10 @@ aPackage('nart.adamantos.client.main', () => {
 		
 		var texLoader = new TextureLoader(gl);
 		
-		texLoader.downloadPack('/get_texture_pack', () => {
-			log("Downloaded texture pack, unpacking...")
-			texLoader.extractPacks(() => {
-				log("Unpacked the texture pack.");
-				afterTexturesLoaded();
-			});
+		texLoader.downloadAndAddPack('/get_texture_pack', () => {
+			log("Received the texture pack.");
+			
+			afterTexturesLoaded();
 		});
 	}
 

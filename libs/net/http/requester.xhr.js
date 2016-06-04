@@ -40,10 +40,7 @@ aPackage('nart.net.http.requester.xhr', () => {
 				});
 				
 				reader.readAsArrayBuffer(xhr.response);
-				/*
-				result.body = new Uint8Array(xhr.response);
-				cb(result);
-				*/
+				
 			} else {
 				result.body = xhr.responseText;
 				cb(result);

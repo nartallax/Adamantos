@@ -103,7 +103,13 @@ aPackage('nart.util.html.client', () => {
 		setFavicon: function(file){ return this.favicon = file || '', this },
 		setMainPackage: function(name){ 
 			this.mainPackageName = name;
-			var deps = arrToMapKeys(Addict.dependencyListOf(name));
+			var rawDeps = null;
+			
+			Addict.withEnvironment('browser', () => {
+				rawDeps = Addict.dependencyListOf(name);
+			});
+			
+			var deps = arrToMapKeys(rawDeps);
 			
 			deps[name] = true;
 			deps['nart.meta.addict'] = true;
