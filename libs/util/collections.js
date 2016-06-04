@@ -1,15 +1,32 @@
 aPackage('nart.util.collections', () => {
 
+	var ThreadLimiter = aRequire('nart.util.limiter.thread');
+
 	return {
 		
-		eachAsync: (arr, action, after) => {
-			if(arr.length < 1) return setTimeout(after, 1);
-			
+		eachAsync: (arr, action, after, simLimit) => {
 			var count = arr.length;
-			arr.forEach(item => action(item, () => {
-				count--;
-				if(count === 0) setTimeout(after, 1);
-			}))
+			if(count < 1) return setTimeout(after, 1);
+			var haveLimit = typeof(simLimit) === 'number' && simLimit > 0;
+			
+			var dec = () => ((--count) === 0) && setTimeout(after, 1)
+			
+			if(!haveLimit){
+				
+				arr.forEach(item => action(item, dec))
+				
+			} else {
+				
+				var limiter = new ThreadLimiter(simLimit),
+					i = 0;
+				
+				limiter.onThreadAvailable(() => {
+					if(i >= arr.length) return;
+					var item = arr[i++];
+					limiter.enqueue(cb => action(item, cb), dec);
+				})
+				
+			}
 		},
 		
 		mapAsync: (arr, mapper, after) => {

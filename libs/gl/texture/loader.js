@@ -10,17 +10,20 @@ aPackage('nart.gl.texture.loader', () => {
 		AnimatedTexture = aRequire('nart.gl.texture.animated');
 	
 	var getBytes = (url, cb) => Requester.get(url, {}, res => cb(res.body), { resultInBuffer: true }),
-		readTextures = (bytes, gl) => {
-			var result = TexturePacker.unpack(bytes);
-			
-			Object.keys(result).forEach(k => {
-				var tex = result[k];
-				result[k] = tex.frames.length === 1? 
-					SimpleTexture(gl, tex.frames[0], tex.width, tex.height): 
-					AnimatedTexture(gl, tex.frames, tex.width, tex.height);
+		readTextures = (bytes, gl, cb) => {
+			var packer = new TexturePacker();
+			packer.addPack(bytes);
+			packer.getUsables(result => {
+				
+				Object.keys(result).forEach(k => {
+					var tex = result[k];
+					result[k] = tex.frames.length === 1? 
+						SimpleTexture(gl, tex.frames[0], tex.width, tex.height): 
+						AnimatedTexture(gl, tex.frames, tex.width, tex.height);
+				});
+				
+				cb(result);
 			});
-			
-			return result;
 		};
 	
 	var TextureLoader = function(gl){
@@ -46,13 +49,14 @@ aPackage('nart.gl.texture.loader', () => {
 		},
 		extractPacks: function(cb){
 			this.packs.forEach(p => {
-				var texs = readTextures(p, this.gl);
-				Object.keys(texs).forEach(name => this.cache[name] = texs[name]);
+				readTextures(p, this.gl, texs => {
+					Object.keys(texs).forEach(name => this.cache[name] = texs[name]);
+					
+					cb();
+				});
 			});
 			
 			this.packs = [];
-			
-			cb();
 			return this;
 		}
 	}

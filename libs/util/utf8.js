@@ -2,14 +2,14 @@ aPackage('nart.util.utf8', () => {
 
 	var utf8 = {
 		byteLength: str => {
-			var res = 0, i = -1;
+			var res = 0, i = -1, len = str.length;
 			while(++i < len) {
 				code = str.charCodeAt(i);
 				res += code < 0x80? 1: code < 0x800? 2: 3;
 			}
 			
 			return res;
-		}
+		},
 		
 		strToBytes: (str, res, start) => {
 			res = res || new Uint8Array(utf8.byteLength(str));

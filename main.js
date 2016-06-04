@@ -44,7 +44,6 @@ require("./libs/meta/addict.js")
 				.setMainPackage('nart.adamantos.client.main');
 				
 			var text = client.getHtml();
-			console.log('BLEN = ' + Buffer.from(text, 'utf8').length);
 				
 			gzip(text, res => {
 				html = res;
@@ -54,11 +53,13 @@ require("./libs/meta/addict.js")
 		
 		var compressedTexturePack = null;
 		var texturePacker = new TexturePacker();
-		texturePacker.addDirectories({'./textures': ''}, () => {
-			 gzip(texturePacker.getPack(), pack => {
-				 log('Built up and compressed texture pack.');
-				 compressedTexturePack = pack;
-			 });
+		texturePacker.addSourceDirectories({'./textures': ''}, () => {
+			texturePacker.getPack(uncompressed => {
+				gzip(uncompressed, compressed => {
+					log('Built up and compressed texture pack.');
+					compressedTexturePack = compressed;
+				});
+			});
 		})
 		
 		new SocketServer(config.server.socket.port, s => {

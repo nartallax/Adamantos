@@ -13,15 +13,18 @@ aPackage('nart.gl.format.gif.reader', () => {
 	var utf8 = aRequire('nart.util.utf8');
 
 	// each frame is a sequence of horisontal lines of RGB pixels
-	function parseBuffer(data, cb) {
-		var reader = new GifReader(data);
+	function parseBuffer(data, offset) {
+		var reader = new GifReader(data, offset);
 		
 		var result = {width: reader.width, height: reader.height, frames: []};
 		
 		var frame = new Uint8Array(reader.width * reader.height * 4);
 		for(var frameNum = 0; frameNum < reader.frames.length; frameNum++){
+			console.log('reading frame ' + frameNum);
 			result.frames.push(frame = reader.decodeAndBlitFrameRGBA(reader.frames[frameNum], frame));
 		}
+		
+		console.log('done reading');
 		
 		return result;
 	}
@@ -48,6 +51,7 @@ aPackage('nart.gl.format.gif.reader', () => {
 			var blockSize;
 			do {
 				this.advance(blockSize = this.readByte());
+				console.log('blocksize = ' + blockSize);
 			} while(blockSize !== 0);
 		},
 		
@@ -116,6 +120,7 @@ aPackage('nart.gl.format.gif.reader', () => {
 	};
 	
 	var readFrameBlockWith = (reader, params) => {
+		console.log('starting to read frame');
 		var x = reader.readShort(),
 			y = reader.readShort(),
 			w = reader.readShort(),
@@ -132,7 +137,9 @@ aPackage('nart.gl.format.gif.reader', () => {
 		var dataOffset = reader.pos;
 		
 		reader.readByte(); // codesize, unused
+		console.log('readed frame header');
 		reader.skipByteSizedBlocks();
+		console.log('skipped blocks');
 		
 		return {x: x, y: y, width: w, height: h, totalWidth: params.width, totalHeight: params.height,
 				 palette_offset: paletteOffset,
@@ -283,10 +290,10 @@ aPackage('nart.gl.format.gif.reader', () => {
 		return output;
 	}
 	
-	function GifReader(buf) {
+	function GifReader(buf, offset) {
 		var p = 0;
 
-		var reader = new BufReader(buf);
+		var reader = new BufReader(buf, offset || 0);
 
 		checkMagicNumber(reader);
 		
@@ -301,6 +308,7 @@ aPackage('nart.gl.format.gif.reader', () => {
 		var width = this.width = header.width;
 		var height = this.height = header.height;
 		
+		console.log('starting to iterate blocks');
 		eachBlock(reader, blockCode => {
 			switch(blockCode){
 				case 0x21: return readExtensionBlockInto(reader, header);
@@ -308,6 +316,7 @@ aPackage('nart.gl.format.gif.reader', () => {
 				default: throw new Error('Unknown GIF block code: 0x' + blockCode.toString(16));
 			}
 		});
+		console.log('done iterating blocks');
 		
 		//return {width: header.width, height: header.height, frames: frames};
 		

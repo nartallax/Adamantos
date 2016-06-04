@@ -34,7 +34,7 @@ aPackage('nart.gl.resource.packer', () => {
 	var Packer = function(){
 		if(!(this instanceof Packer)) return new Packer();
 		
-		this.sourcePaths = [];
+		this.sourcePaths = {}; // name -> path
 		this.sourceBuffers = {};
 		
 		this.readers = [];
@@ -56,9 +56,6 @@ aPackage('nart.gl.resource.packer', () => {
 	};
 	
 	Packer.prototype = {
-		
-		getAddeableFilesFilter: () => (/.*/),
-		
 		addSourceDirectories: function(dirPrefixMap, cb){
 			if(Array.isArray(dirPrefixMap)){
 				var map = {};
@@ -79,17 +76,19 @@ aPackage('nart.gl.resource.packer', () => {
 				prefix = '';
 			}
 			
-			var files = [], filter = this.getAddeableFilesFilter();
+			var files = [], filter = this.getSourceFileNameFilter();
 				
 			eachFileRecursiveIn(directoryPath, path => path.toLowerCase().match(filter) && files.push(path), () => {
-				eachAsync(files, (file, cb) => {
-					var name = Packer.pathToName(file, directoryPath, prefix);
-					if(!name) return cb();
-					this.sourcePaths.push(file);
-				}, cb);
+				eachAsync(files, (file, cb) => (this.addSourceFile(file, directoryPath, prefix), cb()), cb);
 			});
 			
 			return this;
+		},
+		
+		addSourceFile: function(file, dirPrefix, namePrefix){
+			var name = Packer.pathToName(file, dirPrefix, namePrefix);
+			if(!name) throw new Error('Filename could not be converted to name: "' + file + '"');
+			this.sourcePaths[name] = file;
 		},
 		
 		addSourceBuffer: function(buffer, name){
@@ -99,18 +98,21 @@ aPackage('nart.gl.resource.packer', () => {
 		addPack: function(buffer){
 			var readerNum = this.readers.length,
 				reader = this.readers[readerNum] = new ByteManipulator(buffer);
+				
 			while(!reader.finished()) {
-				var name = reader.getString();
+				var name = reader.getString(),
+					len = reader.getUint();
 					
-				this.packedOffsets[name] = {reader: readerNum, offset: reader.pos};
+				this.packedOffsets[name] = {reader: readerNum, offset: reader.pos, length: len};
 					
-				reader.advance(reader.getUint());
+				reader.advance(len);
 			}
 		},
 		
 		// все известные имена
 		getNames: function(){
-			return this.sourcePaths.map(Packer.pathToName).concat(Object.keys(this.sourceBuffers)).concat(Object.keys(this.packedOffsets));
+			return Object.keys(this.sourcePaths)
+				.concat(Object.keys(this.sourceBuffers), Object.keys(this.packedOffsets))
 		},
 		
 		// тут есть такая вилка
@@ -125,21 +127,129 @@ aPackage('nart.gl.resource.packer', () => {
 		//		получать его длину через sourcePackedLength, 
 		//		потом выделить один большой буффер и писать с помощью sourceToPacked сразу в него
 		// первая должна быть быстрее, но вторая более экономна по памяти
-		// я использую 2, т.к. память чаще лимитирует, чем скорость, но, возможно, стоит переписать на 1
+		// я использую 2й, т.к. память чаще лимитирует, чем скорость загрузки, но, возможно, стоит переписать на 1й
 		
-		getPackLength: function(){
-			return this.sourcePaths.
+		eachSourceFile: function(body, after){
+			eachAsync(Object.keys(this.sourcePaths), 
+				(name, cb) => body(this.sourcePaths[name], cb, name),
+				after, 25); // no more than 25 files processed simultaneously
 		},
 		
-		getPack: function(){
-			var buffers = [];
+		eachSourceFileAsBuffer: function(body, after){
+			this.eachSourceFile((file, cb, name) => {
+				fs.readFile(file, err(buffer => body(buffer, cb, name)));
+			}, after);
+		},
+		
+		lengthOfSourceFiles: function(cb){
+			var result = 0;
+			this.eachSourceFileAsBuffer((buffer, cb) => {
+				result += this.sourcePackedLength(new ByteManipulator(buffer));
+				cb();
+			}, () => cb(result));
+		},
+		
+		// get reader of packed resource that is already added to this packer
+		getPackedReader: function(name){
+			var off = this.packedOffsets[name];
+			var reader = this.readers[off.reader];
+			reader.moveTo(off.offset);
+			return reader;
+		},
+		
+		getPackLength: function(cb){
+			this.lengthOfSourceFiles(result => {
+				
+				Object.keys(this.sourceBuffers).forEach(name => result += this.sourcePackedLength(this.sourceBuffers[name]));
+				Object.keys(this.packedOffsets).forEach(name => {
+					var reader = this.getPackedReader(name);
+					reader.advance(-4);
+					result += reader.readUint();
+				});
+				
+				this.getNames().forEach(name => result += 4 + 2 + utf8.byteLength(name)); // место для заголовков
+				
+				cb(result);
+			});
+		},
+		
+		getPack: function(cb){
+			this.getPackLength(totalLength => {
+				var writer = ByteManipulator.alloc(totalLength);
+				
+				var writeFromReader = (name, reader) => {
+					writer.putString(name);
+					
+					reader.advance(-4);
+					var len = reader.getUint();
+					writer.putUint(len);
+					
+					writer.transfer(reader, len);
+				};
+				
+				var writeSource = (name, sourceBuffer) => {
+					writer.putString(name);
+					var sourceReader = new ByteManipulator(sourceBuffer);
+					var bufLen = this.sourcePackedLength(sourceReader);
+					writer.putUint(bufLen);
+					
+					sourceReader.moveTo(0);
+					this.sourceToPacked(sourceReader, writer);
+				};
+				
+				this.eachSourceFileAsBuffer((buffer, cb, name) => {
+					writeSource(name, buffer);
+					cb();
+				}, () => {
+					
+					Object.keys(this.sourceBuffers).forEach(name => writeSource(name, this.sourceBuffers[name]));
+					Object.keys(this.packedOffsets).forEach(name => writeFromReader(name, this.getPackedReader(name)));
+					
+					
+					cb(writer.getBuffer());
+				});
+				
+			});
+		},
+		
+		getUsables: function(cb){
+			var result = {};
+			
+			Object.keys(this.packedOffsets).forEach(name => {
+				result[name] = this.packedToUsable(this.getPackedReader(name));
+			});
+			
+			var addSourceBuf = (name, sourceBuf) => {
+				var len = this.sourcePackedLength(sourceBuf);
+				var intermediate = ByteManipulator.alloc(len);
+				this.sourceToPacked(new ByteManipulator(sourceBuf), intermediate);
+				intermediate.moveTo(0);
+				result[name] = this.packedToUsable(intermediate);
+			};
+			
+			Object.keys(this.sourceBuffers).forEach(name => addSourceBuf(name, this.sourceBuffers[name]));
+			
+			this.eachSourceFileAsBuffer((buf, cb, name) => (addSourceBuf(name, buf), cb), () => {
+				cb(result)
+			});
 		},
 		
 		
-		sourcePackedLength: reader => { throw new Error('Not implemented: sourcePackedLength'); },
+		// methods to be overriden in child classes
+		getSourceFileNameFilter: () => (/.*/),
 		
-		sourceToPacked: (reader, writer) => { throw new Error('Not implemented: sourceToPacked'); },
-		packedToUsable: reader => { throw new Error('Not implemented: packedToUsable'); },
+		sourcePackedLength: reader => { 
+			//throw new Error('Not implemented: sourcePackedLength'); 
+			return reader.bytesToEnd(); // packed length === source.length
+		},
+		
+		sourceToPacked: (reader, writer) => { 
+			//throw new Error('Not implemented: sourceToPacked'); 
+			return writer.transferBytes(reader); // no packing, packed data === source data
+		},
+		packedToUsable: reader => { 
+			throw new Error('Not implemented: packedToUsable'); 
+		},
 	};
 	
 	return Packer;
