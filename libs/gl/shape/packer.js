@@ -6,7 +6,7 @@ aPackage('nart.gl.shape.packer', () => {
 		distinct = aRequire('nart.util.collections').distinct;
 
 	var ShapePacker = function(){
-		if(!(this instanceof Packer)) return new Packer();
+		if(!(this instanceof ShapePacker)) return new ShapePacker();
 		
 		this.models = {};
 		this.nameResolver = s => s;
@@ -60,7 +60,7 @@ aPackage('nart.gl.shape.packer', () => {
 	}
 	
 	ShapePacker.prototype.packedToUsable = (reader, len) => {
-		var lines = utf8.bytesToStr(reader.getBuffer(), reader.getPosition(), len).split(/[\n\r]+/);
+		var lines = utf8.bytesToStr(reader.getBuffer(), reader.getPosition(), reader.getPosition() + len).split(/[\n\r]+/);
 		var triangles = ObjReader.objLinesToTrianglesWithTextureNames(lines);
 		
 		var primitives = {};

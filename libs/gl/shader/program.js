@@ -22,7 +22,7 @@ aPackage('nart.gl.shader.program', () => {
 	ShaderProgram.prototype = {
 		activate: function(){ return (activeShaderProgram === this) || this.gl.useProgram((activeShaderProgram = this).program) },
 		clear: function(b){ return this.shaderPack.clear(b) },
-		draw: function(frameNum, s, b){ return this.shaderPack.draw(frameNum, s, b) }
+		draw: function(time, s, b){ return this.shaderPack.draw(time, s, b) }
 	}
 	
 	return ShaderProgram;

@@ -23,16 +23,17 @@ aPackage('nart.gl.shape.simple', () => {
 	}, {
 		setHighlightColor: function(d){ return this.highlightColor = d, this },
 		
-		getPrimitives: function(frameNum){ 
+		getPrimitives: function(frameNum){
 			return this.primitives 
 		},
 		
-		addPrimitive: function(vertex, vertexIndex, texture, textureIndex){ 
+		addPrimitive: function(vertex, vertexIndex, texture, textureIndex){
 			this.primitives.push({
 				vertex: glutil.bufferOf(this.gl, vertex, 3, this.gl.ARRAY_BUFFER, Float32Array), 
 				vertexIndex: glutil.bufferOf(this.gl, vertexIndex, 1, this.gl.ELEMENT_ARRAY_BUFFER, Uint16Array),
 				texture: texture, 
-				textureIndex: glutil.bufferOf(this.gl, textureIndex, 2, this.gl.ARRAY_BUFFER, Float32Array)}) 
+				textureIndex: glutil.bufferOf(this.gl, textureIndex, 2, this.gl.ARRAY_BUFFER, Float32Array)
+			}) 
 		}
 	}, Shape);
 	

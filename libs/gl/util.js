@@ -41,7 +41,7 @@ aPackage('nart.gl.util', () => {
 		cb => setTimeout(cb, 1000/60);
 
 	var bufferOf = function(gl, smth, itemSize, bufferType, arrayType){
-		if(!Array.isArray(smth)) return smth;
+		if(!Array.isArray(smth) && (!smth || smth.constructor !== arrayType)) return smth;
 		
 		var result = gl.createBuffer();
 

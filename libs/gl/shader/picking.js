@@ -34,7 +34,7 @@ aPackage('nart.gl.shader.picking', () => {
 		this.projectionMatrix.set(b.projectionMatrix)
 	}
 	
-	var drawWithMatrix = (frameNumber, t, s, m) => {
+	var drawWithMatrix = (time, t, s, m) => {
 		t.withTranslatedMatrix(t.viewMatrix, m, s, m => {
 			if(s.childShapes){
 				var c = s.childShapes;
@@ -59,8 +59,8 @@ aPackage('nart.gl.shader.picking', () => {
 		})
 	}
 	
-	var draw = function(frameNumber, s, b){ 
-		return drawWithMatrix(frameNumber, this, s, b.modelViewMatrix)
+	var draw = function(time, s, b){ 
+		return drawWithMatrix(time, this, s, b.modelViewMatrix)
 	}
 	
 	return gl => new ShaderPack(gl, `

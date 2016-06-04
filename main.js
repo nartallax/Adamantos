@@ -68,7 +68,7 @@ require("./libs/meta/addict.js")
 			compressedTexturePack = pack;
 		})
 		
-		getCompressedPackOf(ShapePacker, {'./textures': ''}, pack => {
+		getCompressedPackOf(ShapePacker, {'./shapes': ''}, pack => {
 			log('Built up and compressed shape pack.');
 			compressedShapePack = pack;
 		})
@@ -113,8 +113,14 @@ require("./libs/meta/addict.js")
 							});
 							res.write(compressedTexturePack);
 							break;
-						case 'get_model_pack':
-							
+						case 'get_shape_pack':
+							res.writeHead(200, { 
+								'Content-Type': 'application/octet-stream', 
+								'Content-Length': compressedShapePack.length,
+								'Content-Encoding': 'gzip'
+							});
+							res.write(compressedShapePack);
+							break;
 						default:
 							res.writeHead(200, { 
 								'Content-Type': 'text/html',

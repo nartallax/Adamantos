@@ -60,7 +60,7 @@ aPackage('nart.gl.format.obj.reader', () => {
 			});
 		},
 		
-		objLinesToTriangles: (text, materialAttrName) => {
+		objLinesToTriangles: (lines, materialAttrName) => {
 			var result = {
 				mtl: [], // paths to mtl files
 				triangles: [] // { vertex: [[1, 1, 1] x3 ], texture: [[1, 1] x3 ], material: 'name'}

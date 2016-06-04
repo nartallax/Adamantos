@@ -17,19 +17,19 @@ aPackage('nart.gl.shader.typical', () => {
 		b.ambientColorBuffer && this.ambientColor.set(b.ambientColorBuffer);
 	}
 	
-	var drawWithMatrix = (frameNumber, t, s, m) => {
+	var drawWithMatrix = (time, t, s, m) => {
 		var gl = t.gl;
 		
 		t.withTranslatedMatrix(t.viewMatrix, m, s, m => {
 			t.highlightColor.set(s.highlightColor || [0, 0, 0]);
 			
-			var prims = s.getPrimitives(frameNumber);
+			var prims = s.getPrimitives(time);
 			for(var i = 0; i < prims.length; i++){
 				var p = prims[i];
 				t.vertexPosition.set(p.vertex);
 				
 				gl.activeTexture(gl.TEXTURE0);
-				gl.bindTexture(gl.TEXTURE_2D, p.texture.getFrame(frameNumber));
+				gl.bindTexture(gl.TEXTURE_2D, p.texture.getFrame(time));
 			
 				t.textureIndex.set(p.textureIndex);
 				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.vertexIndex);
@@ -57,8 +57,8 @@ aPackage('nart.gl.shader.typical', () => {
 		})
 	}
 	
-	var draw = function(frameNumber, s, b){ 
-		drawWithMatrix(frameNumber, this, s, b.modelViewMatrix) 
+	var draw = function(time, s, b){ 
+		drawWithMatrix(time, this, s, b.modelViewMatrix) 
 	}
 	
 	return (gl, params) => new ShaderPack(gl, `

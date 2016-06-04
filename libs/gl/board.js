@@ -9,7 +9,8 @@ aPackage('nart.gl.board', () => {
 		PickingShaderPack = aRequire('nart.gl.shader.picking'),
 		Event = aRequire('nart.util.event'),
 		onNextScreenFrame = aRequire('nart.gl.util').onNextScreenFrame,
-		mat4 = aRequire('nart.gl.external.matrix').mat4;
+		mat4 = aRequire('nart.gl.external.matrix').mat4,
+		msec = aRequire('nart.util.time').milliseconds;
 			
 	var Board = function(canvas){
 		if(!(this instanceof Board)) return new Board(canvas);
@@ -34,6 +35,7 @@ aPackage('nart.gl.board', () => {
 		this.afterTick = new Event();
 		this.viewportActualizationFrequency = 60;
 		this.ticksPassed = 0;
+		this.startTime = msec();
 	};
 
 	Board.prototype = {
@@ -55,14 +57,14 @@ aPackage('nart.gl.board', () => {
 			mat4.perspective(45, this.gl.viewportWidth / this.gl.viewportHeight, 0.1, 100.0, this.projectionMatrix);
 		},
 		drawWithProgram: function(p){
-			//if(this.ticksPassed === 0) this.clearWithProgram(p)
 			return this.clearWithProgram(p).drawChildrenWithProgram(p)
 			
 		},
 		drawChildrenWithProgram: function(s){
 			s.activate();
+			var timeOffset = msec() - this.startTime;
 			var c = this.children, m = this.modelViewMatrix, pm = this.projectionMatrix;
-			for(var i in c) s.draw(this.ticksPassed, c[i], this);
+			for(var i in c) s.draw(timeOffset, c[i], this);
 		},
 		clearWithProgram: function(p){
 		

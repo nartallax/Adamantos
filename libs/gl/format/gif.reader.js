@@ -310,12 +310,24 @@ aPackage('nart.gl.format.gif.reader', () => {
 		});
 		
 		
-		//return {width: header.width, height: header.height, frames: frames};
 		
+		// TODO: функция неоптимальна, много копирования / перезаписи
+		// врубиться в этот код, писать в каждый пиксель ровно один раз
 		this.decodeAndBlitFrameRGBA = function(frame, baseFrame) {
 			var num_pixels = frame.width * frame.height;
 			var index_stream = new Uint8Array(num_pixels);	// At most 8-bit indices.
 			var pixels = baseFrame.slice(0);//new Uint8Array(frame.totalWidth * frame.totalHeight * 4);
+			
+			// предварительная перезапись
+			for(var x = frame.x; x < frame.width + frame.x; x++){
+				for(var y = frame.y; y < frame.height + frame.y; y++){
+					var off = (y * width) + x;
+					pixels[off + 0] = 0;
+					pixels[off + 1] = 0;
+					pixels[off + 2] = 0;
+					pixels[off + 3] = 0;
+				}
+			}
 			
 			decodeIndexStreamInto(new BufReader(buf, frame.data_offset), index_stream);
 			
