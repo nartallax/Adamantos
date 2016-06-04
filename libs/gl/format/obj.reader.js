@@ -60,7 +60,7 @@ aPackage('nart.gl.format.obj.reader', () => {
 			});
 		},
 		
-		readTriangles: (path, cb, materialAttrName) => {
+		objLinesToTriangles: (text, materialAttrName) => {
 			var result = {
 				mtl: [], // paths to mtl files
 				triangles: [] // { vertex: [[1, 1, 1] x3 ], texture: [[1, 1] x3 ], material: 'name'}
@@ -81,47 +81,55 @@ aPackage('nart.gl.format.obj.reader', () => {
 					
 					result.triangles.push(tr);
 				}
-			
-			readLines(path, lines => {
-				lines.forEach(l => {
-					var p = l.replace(/(^\s+|\s+$)/g, '').split(/\s+/);
-					if(p.length < 1) return;
-					switch((p[0] || '').toLowerCase()){
-						case 'mtllib':
-							return result.mtl.push(ObjReader.resolvePathByObj(path, p[1]));
-						case 'usemtl':
-							return material = p[1];
-						case 'v':
-							p = p.slice(1, 4).map(s => parseFloat(s)).filter(s => !Number.isNaN(s));
-							if(p.length < 3) return;
-							vertex.push(p);
-							return;
-						case 'vt':
-							p = p.slice(1, 3).map(s => parseFloat(s)).filter(s => !Number.isNaN(s));
-							if(p.length < 2) return;
-							texture.push(p);
-							return;
-						case 'f': //самое интересное!
-							var nums = p.slice(1)
-								.map(s => s.split('/').map(s => parseInt(s)).filter(n => !Number.isNaN(n)))
-								.filter(a => a.length > 0);
-								
-							if(nums.length < 3) return;
-							
-							for(var i = 2; i < nums.length; i++){
-								var a = nums[i - 2], b = nums[i - 1], c = nums[i];
-								triangleBy(a[0], b[0], c[0], a[1], b[1], c[1]);
-							}
-							return;
-					}
-				});
 				
-				cb(result);
-			})
+			lines.forEach(l => {
+				var p = l.replace(/(^\s+|\s+$)/g, '').split(/\s+/);
+				if(p.length < 1) return;
+				switch((p[0] || '').toLowerCase()){
+					case 'mtllib':
+						return result.mtl.push(ObjReader.resolvePathByObj(path, p[1]));
+					case 'usemtl':
+						return material = p[1];
+					case 'v':
+						p = p.slice(1, 4).map(s => parseFloat(s)).filter(s => !Number.isNaN(s));
+						if(p.length < 3) return;
+						vertex.push(p);
+						return;
+					case 'vt':
+						p = p.slice(1, 3).map(s => parseFloat(s)).filter(s => !Number.isNaN(s));
+						if(p.length < 2) return;
+						texture.push(p);
+						return;
+					case 'f': //самое интересное!
+						var nums = p.slice(1)
+							.map(s => s.split('/').map(s => parseInt(s)).filter(n => !Number.isNaN(n)))
+							.filter(a => a.length > 0);
+							
+						if(nums.length < 3) return;
+						
+						for(var i = 2; i < nums.length; i++){
+							var a = nums[i - 2], b = nums[i - 1], c = nums[i];
+							triangleBy(a[0], b[0], c[0], a[1], b[1], c[1]);
+						}
+						return;
+				}
+			});
+			
+			return result;
+		},
+		
+		readTriangles: (path, cb, materialAttrName) => {
+			readLines(path, lines => {
+				cb(ObjReader.objLinesToTriangles(lines, materialAttrName))
+			});
 		},
 			
-		readWithTextureNames: (path, cb) => {
-			ObjReader.readTriangles(path, data => cb(data.triangles), 'textureName');
+		readWithTextureNames: (pathOrBuffer, cb) => {
+			ObjReader.readTriangles(pathOrBuffer, data => cb(data.triangles), 'textureName');
+		},
+		
+		objLinesToTrianglesWithTextureNames: lines => {
+			return ObjReader.objLinesToTriangles(lines, 'textureName').triangles;
 		}
 	}
 	

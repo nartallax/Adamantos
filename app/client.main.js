@@ -109,7 +109,7 @@ aPackage('nart.adamantos.client.main', () => {
 					]})(), 
 					highlightColor: [0.15, 0.15, 0.15],
 					z: -10.0, rotX: 0.5, texture: texLoader.get("crate")}))();
-			/*
+			
 			(() => SimpleShape({
 					vertex: (() => { return[
 						// Front face
@@ -195,7 +195,6 @@ aPackage('nart.adamantos.client.main', () => {
 					]})(), 
 					//highlightColor: [0.15, 0.15, 0.15],
 					z: -15.0, rotX: 0.5, textureName: "crate"}))();
-					*/
 					
 					
 			var clones = [cube];
@@ -218,7 +217,7 @@ aPackage('nart.adamantos.client.main', () => {
 			*/
 			
 			var fps = 0, ticks = 0;
-			setInterval(() => { console.log('FPS = ' + fps + ', ticks = ' + ticks), (fps = ticks = 0) }, 1000)
+			//setInterval(() => { console.log('FPS = ' + fps + ', ticks = ' + ticks), (fps = ticks = 0) }, 1000)
 			
 			setInterval(() => {
 				ticks++;

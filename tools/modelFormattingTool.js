@@ -24,8 +24,6 @@ require(__dirname + "/../libs/meta/addict.js")
 		}
 		
 		var Packer = aRequire('nart.gl.resource.packer'),
-			TexturePacker = aRequire('nart.gl.texture.packer'),
-			ShapePacker = aRequire('nart.gl.shape.packer'),
 			ObjReader = aRequire('nart.gl.format.obj.reader'),
 			
 			Countdown = aRequire('nart.util.countdown'),

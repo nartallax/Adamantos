@@ -157,6 +157,10 @@ aPackage('nart.gl.resource.packer', () => {
 			return reader;
 		},
 		
+		getPackedLengthOf: function(name){
+			return this.packedOffsets[name].length;
+		},
+		
 		getPackLength: function(cb){
 			this.lengthOfSourceFiles(result => {
 				
@@ -216,7 +220,7 @@ aPackage('nart.gl.resource.packer', () => {
 			var result = {};
 			
 			Object.keys(this.packedOffsets).forEach(name => {
-				result[name] = this.packedToUsable(this.getPackedReader(name));
+				result[name] = this.packedToUsable(this.getPackedReader(name), this.getPackedLengthOf(name));
 			});
 			
 			var addSourceBuf = (name, sourceBuf) => {
@@ -224,7 +228,7 @@ aPackage('nart.gl.resource.packer', () => {
 				var intermediate = ByteManipulator.alloc(len);
 				this.sourceToPacked(new ByteManipulator(sourceBuf), intermediate);
 				intermediate.moveTo(0);
-				result[name] = this.packedToUsable(intermediate);
+				result[name] = this.packedToUsable(intermediate, len);
 			};
 			
 			Object.keys(this.sourceBuffers).forEach(name => addSourceBuf(name, this.sourceBuffers[name]));
@@ -247,7 +251,7 @@ aPackage('nart.gl.resource.packer', () => {
 			//throw new Error('Not implemented: sourceToPacked'); 
 			return writer.transferBytes(reader); // no packing, packed data === source data
 		},
-		packedToUsable: reader => { 
+		packedToUsable: (reader, length) => { 
 			throw new Error('Not implemented: packedToUsable'); 
 		},
 	};

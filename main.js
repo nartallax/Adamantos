@@ -23,7 +23,8 @@ require("./libs/meta/addict.js")
 			Messenger = aRequire('nart.net.message.messenger'),
 			config = aRequire('config'),
 			htmlAssembler = aRequire('nart.util.html.client'),
-			TexturePacker = aRequire('nart.gl.texture.packer');
+			TexturePacker = aRequire('nart.gl.texture.packer'),
+			ShapePacker = aRequire('nart.gl.shape.packer');
 			
 		var gzip = function(input, cb){
 			zlib.gzip(input instanceof Buffer? input: Buffer.from(input, 'utf8'), {
@@ -51,17 +52,26 @@ require("./libs/meta/addict.js")
 			});
 		})();
 		
-		var compressedTexturePack = null;
-		var texturePacker = new TexturePacker();
-		texturePacker.addSourceDirectories({'./textures': ''}, () => {
-			texturePacker.getPack(uncompressed => {
-				gzip(uncompressed, compressed => {
-					log('Built up and compressed texture pack.');
-					compressedTexturePack = compressed;
+		var getCompressedPackOf = (packerClass, dirPrefixMap, cb) => {
+			var packer = new packerClass();
+			packer.addSourceDirectories(dirPrefixMap, () => {
+				packer.getPack(uncompressed => {
+					gzip(uncompressed, cb);
 				});
 			});
+		};
+		
+		var compressedTexturePack, compressedShapePack;
+		
+		getCompressedPackOf(TexturePacker, {'./textures': ''}, pack => {
+			log('Built up and compressed texture pack.');
+			compressedTexturePack = pack;
 		})
 		
+		getCompressedPackOf(ShapePacker, {'./textures': ''}, pack => {
+			log('Built up and compressed shape pack.');
+			compressedShapePack = pack;
+		})
 		new SocketServer(config.server.socket.port, s => {
 
 			var c = ClientWrapper(RawClient(s)), ip = c.getIp()
