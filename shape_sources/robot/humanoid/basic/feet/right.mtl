@@ -2,9 +2,9 @@
 ## Alias OBJ Material File
 # Exported from SketchUp, (c) 2000-2012 Trimble Navigation Limited
 
-newmtl _1
+newmtl iron
 Ka 0.000000 0.000000 0.000000
-Kd 0.498039 0.505882 0.505882
+Kd 0.662745 0.682353 0.694118
 Ks 0.330000 0.330000 0.330000
-map_Kd detail/_1.gif
+map_Kd right/iron.png
 

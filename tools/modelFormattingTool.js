@@ -33,6 +33,8 @@ require(__dirname + "/../libs/meta/addict.js")
 			putFile = aRequire('nart.util.fs').putFile,
 			eachFileRecursiveIn = aRequire('nart.util.fs').eachFileRecursiveIn,
 			distinct = aRequire('nart.util.collections').distinct,
+			eachAsync = aRequire('nart.util.collections').eachAsync,
+			readGif = aRequire('nart.gl.format.gif.reader'),
 			
 			path = aRequire.node('path'),
 			fs = aRequire.node('fs');
@@ -55,16 +57,39 @@ require(__dirname + "/../libs/meta/addict.js")
 			mkDir(pathParts.slice(0, pathParts.length - 1).join(path.sep), () => cb && cb(resultFile));
 		}
 		
+		var copyFile = (source, destination, cb) => {
+			fs.createReadStream(source).pipe(fs.createWriteStream(destination)).on('close', cb || (() => {}));
+		}
+		
+		var getTmpPath = (ext, cb) => getFileInDir('.', cb, 'temp_', '.' + ext);
+		
 		var transferFile = (file, sourceDir, destDir, cb) => {
 			createAndGetDestinationPath(file, sourceDir, destDir, dest => {
-				fs.createReadStream(file).pipe(fs.createWriteStream(dest)).on('close', cb || (() => {}));
+				copyFile(file, dest, cb);
 			});
 		}
+		
+		var isCorrectGif = (path, cb) => {
+			fs.readFile(path, (e, buf) => {
+				if(e){
+					console.log('Error reading texture ' + path + ': ' + e.message);
+					return cb(false);
+				}
+				
+				try {
+					readGif(buf);
+				} catch(e){
+					console.log('Error reading texture ' + path + ': ' + e.message);
+					return cb(false);
+				}
+				return cb(true);
+			});
+		};
 		
 		var transferModel = (obj, cb) => {
 			total++;
 			ObjReader.readMaterialsWithPaths(obj, matMap => {
-				var texturePaths = Object.keys(matMap).map(k => matMap[k]);
+				var texturePaths = distinct(Object.keys(matMap).map(k => matMap[k]));
 				
 				if(texturePaths.length === 0) {
 					return cb(console.error('Will not process model ' + obj + ': it has no textures at all.'));
@@ -72,31 +97,37 @@ require(__dirname + "/../libs/meta/addict.js")
 				
 				var badTextures = texturePaths.filter(f => !f || typeof(f) !== 'string');
 				if(badTextures.length > 0){
-					return cb(console.error('Will not process model ' + obj + ': ' + badTextures.length + ' of its triangles have no texture.'));
+					return cb(console.error('Will not process model ' + obj + ': some of its triangles have no texture.'));
 				}
 				
-				var unsupportedFormatTextures = distinct(texturePaths).filter(f => !f.toLowerCase().endsWith('.gif'));
-				if(unsupportedFormatTextures.length > 0){
-					return cb(console.error('Will not process model ' + obj + ': ' + unsupportedFormatTextures.length + ' texture images have wrong format (.gif file expected).'));
-				}
-				
-				
-				var counter = new Countdown(1, () => (success++, cb && cb()));
-				
-				
-				texturePaths.forEach(p => {
-					counter.inc();
-					transferFile(p, sourceDir, textureDir, counter.dec);
-				});
-				
-				
-				var matNameMap = {};
-				Object.keys(matMap).forEach(k => matNameMap[k] = pathToName(matMap[k]));
-				
-				ObjReader.getSimplifiedObj(obj, matNameMap, text => {
-					createAndGetDestinationPath(obj, sourceDir, modelDir, dest => {
-						putFile(dest, text, counter.dec);
+				var nonSupportedTextures = [];
+				eachAsync(texturePaths, (path, cb) => isCorrectGif(path, result => {
+					if(!result){
+						nonSupportedTextures.push(path);
+					}
+					cb();
+				}), () => {
+					if(nonSupportedTextures.length > 0){
+						return cb(console.error('Will not process model ' + obj + ': ' + nonSupportedTextures.length + ' texture images have some problems (.gif file expected).'));
+					}
+					
+					var counter = new Countdown(1, () => (success++, cb && cb()));
+			
+					texturePaths.forEach(p => {
+						counter.inc();
+						transferFile(p, sourceDir, textureDir, counter.dec);
 					});
+					
+					
+					var matNameMap = {};
+					Object.keys(matMap).forEach(k => matNameMap[k] = pathToName(matMap[k]));
+					
+					ObjReader.getSimplifiedObj(obj, matNameMap, text => {
+						createAndGetDestinationPath(obj, sourceDir, modelDir, dest => {
+							putFile(dest, text, counter.dec);
+						});
+					});
+					
 				});
 			});
 		};
