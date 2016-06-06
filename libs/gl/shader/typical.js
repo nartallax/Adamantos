@@ -96,6 +96,9 @@ aPackage('nart.gl.shader.typical', () => {
 			vec4 textureColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
 			gl_FragColor = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
 			
+			if(gl_FragColor.a < 0.5)
+				discard;
+			
 			// no lighting
 			//gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
 		}						
