@@ -46,21 +46,23 @@ aPackage('nart.adamantos.client.main', () => {
 		var afterResourcesLoaded = () => {
 		
 			log('Preloaded');
+			var clones = [];
 				
-			var clz = shapeLoader.get('detail').clone();
-			clz.z = -10.0;
-			clz.x = 5.0;
+			var clz = shapeLoader.get('robot.humanoid.basic.feet.right').clone();
+			clz.z = -1.0;
+			clz.x = 0;
 			clz.rotX = 0.5;
 			clz.highlightColor = [0.15, 0.15, 0.15];			
 			board.addChild(clz);
+			clones.push(clz);
 			
+			/*
 			var flamebox = shapeLoader.get('boxxy.box').clone();
 			flamebox.z = -10.0;
 			flamebox.rotX = 0.5;
-			
 			board.addChild(flamebox);
-			
-			var clones = [clz, flamebox];
+			clones.push(flamebox);
+			*/
 			
 			/*
 			var clones = [];

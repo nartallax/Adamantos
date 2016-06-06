@@ -45,13 +45,13 @@ aPackage('nart.gl.format.obj.reader', () => {
 			});
 		}, 
 		
-		getSimplifiedObj: (obj, matMap, cb) => {
+		getSimplifiedObj: (obj, matInternalToExternalName, cb) => {
 			readLines(obj, lines => {
 				cb(lines.filter(l => l.match(/^(usemtl|v|vt|f)\s/)).map(l => {
 					l = l.replace(/(^\s+|\s+$)/g, '');
 					var p = l.split(/\s+/);
 					switch((p[0] || '').toLowerCase()){
-						case 'usemtl': return 'usemtl ' + matMap[p[1].replace(/(^\s+|\s+$)/g, '')];
+						case 'usemtl': return 'usemtl ' + matInternalToExternalName(p[1].replace(/(^\s+|\s+$)/g, ''));
 						case 'f': 
 							return 'f ' + p.slice(1).map(p => p.split(/[\/\\]/).slice(0, 2).join('/')).join(' ')
 						default: return l;
@@ -122,10 +122,6 @@ aPackage('nart.gl.format.obj.reader', () => {
 			readLines(path, lines => {
 				cb(ObjReader.objLinesToTriangles(lines, materialAttrName))
 			});
-		},
-			
-		readWithTextureNames: (pathOrBuffer, cb) => {
-			ObjReader.readTriangles(pathOrBuffer, data => cb(data.triangles), 'textureName');
 		},
 		
 		objLinesToTrianglesWithTextureNames: lines => {

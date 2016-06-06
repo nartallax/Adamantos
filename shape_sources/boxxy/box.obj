@@ -6,7 +6,7 @@ mtllib box.mtl
 
 g Mesh1 Model
 
-usemtl st
+usemtl fire
 v 1 0 -1
 vt -1 1
 vn 0 -1 -0

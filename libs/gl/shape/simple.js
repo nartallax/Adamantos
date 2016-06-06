@@ -24,7 +24,7 @@ aPackage('nart.gl.shape.simple', () => {
 		setHighlightColor: function(d){ return this.highlightColor = d, this },
 		
 		getPrimitives: function(frameNum){
-			return this.primitives 
+			return this.primitives
 		},
 		
 		addPrimitive: function(vertex, vertexIndex, texture, textureIndex){

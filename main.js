@@ -41,7 +41,7 @@ require("./libs/meta/addict.js")
 		(() => {
 			var client = new htmlAssembler()
 				.setTitle('Adamantos')
-				.setFavicon('./textures/violet_gem.png')
+				.setFavicon('./violet_gem.png')
 				.setMainPackage('nart.adamantos.client.main');
 				
 			var text = client.getHtml();
