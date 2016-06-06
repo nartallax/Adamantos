@@ -56,10 +56,11 @@ aPackage('nart.adamantos.client.main', () => {
 			
 			var flamebox = shapeLoader.get('boxxy.box').clone();
 			flamebox.z = -10.0;
+			flamebox.rotX = 0.5;
 			
 			board.addChild(flamebox);
 			
-			var clones = [clz];
+			var clones = [clz, flamebox];
 			
 			/*
 			var clones = [];
