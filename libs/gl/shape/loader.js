@@ -26,5 +26,9 @@ aPackage('nart.gl.shape.loader', () => {
 		return shape;
 	};
 	
+	ShapeLoader.prototype.get = function(name){
+		return ResoureLoader.prototype.get.call(this, name).clone();
+	}
+	
 	return ShapeLoader;
 });
