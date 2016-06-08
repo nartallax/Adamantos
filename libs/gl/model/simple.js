@@ -23,7 +23,7 @@
 1. абсолютная: позиция шейпа задается смещением относительно (0, 0, 0) модели
 	изначальное положение шейпа задается координатами относительно нуля
 2. bones (анимация костями): позиция шейпа задается одним значением; это значение - угол поворота шейпа относительно того шейпа, к которому он крепится
-	изначальное положение шейпа задается именем другого шейпа, точкой внутри этого шейпа, точкой внутри другого шейпа (эти точки задают точку вращния) и осью вращения (ось вращения - 3 числа, определяющих, насколько влияет угол наклона шейпа на поворот его относительно x, y и z)
+	изначальное положение шейпа задается именем другого шейпа, смещением нуля этого шейпа относительно нуля другого шейпа и осью вращения (ось вращения - 3 числа, определяющих, насколько влияет угол наклона шейпа на поворот его относительно x, y и z); точка вращения - ноль этого шейпа
 */
 aPackage('nart.gl.model.simple', () => {
 
@@ -32,7 +32,42 @@ aPackage('nart.gl.model.simple', () => {
 
 	var Model = defineClass(function(data){
 		if(!(this instanceof Model)) return new Model(data);
+		
+		this.parts = {};
+		this.animations = {};
 	}, {
+		eachAnimation: function(cb){ Object.keys(this.animations).forEach(name => cb(this.animations[name], name)); },
+		eachPart: function(cb){ Object.keys(this.parts).forEach(name => cb(this.parts[name], name)); },
+		
+		addPart: function(name, shape, pos){ 
+			return this.parts[name] = new Part(this, shape, pos);
+		},
+		addAnimation: function(name, parts, frames){
+			return this.animations[name] = new Animation(this, parts, frames);
+		},
+		
+		getPart: function(name){ 
+			var part = this.parts[name];
+			if(!part) throw new Error('There is no part named "' + name + '".');
+			return part;
+		},
+		getAnimation: function(name){
+			var a = this.animations[name];
+			if(!a) throw new Error('There is no animation named "' + name + '".');
+			return a;
+		},
+		
+		removePart: function(name){
+			delete this.parts[name];
+			
+			this.eachAnimation(a => a.removePart(name));
+		},
+		renamePart: function(oldName, newName){ 
+			this.parts[newName] = this.getPart(oldName);
+			delete this.parts[oldName];
+			
+			this.eachAnimation(a => a.renamePart(oldName, newName));
+		}
 	}, Shape)
 	
 	return Model;
