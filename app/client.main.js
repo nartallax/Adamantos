@@ -48,7 +48,7 @@ aPackage('nart.adamantos.client.main', () => {
 			log('Preloaded');
 			var clones = [];
 				
-			var clz = shapeLoader.get('robot.humanoid.basic.feet.left').clone();
+			var clz = shapeLoader.get('robot.humanoid.basic.leg.lower').clone();
 			clz.z = -1.0;
 			clz.x = 0;
 			clz.rotX = 0.5;
