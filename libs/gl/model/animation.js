@@ -126,10 +126,28 @@ aPackage('nart.gl.model.animation', () => {
 			
 			
 			
-			var result = {};
+			var result = {}, timeOffset = 0;
 			
-			Object.keys(this.parts).forEach(name => {
-			});
+			Object.keys(this.parts).forEach(name => result[name] = []);
+			
+			while(timeOffset < totalAnimationLength){
+				var positions = {};
+				
+				this.parts.forEach((name, partIndex) => {
+					var prev = getPrevOrCurrentAt(timeOffset, partIndex),
+						next = getNextAt(timeOffset, partIndex);
+					
+					var startTime = prev.time, finishTime = next.time;
+					if(finishTime <= startTime) finishTime += totalAnimationLength
+					var spanLength = finishTime - startTime;
+					
+					positions[name] = this.parts[name].positioning.getPosition(prev.value, next.value, positions);
+				});
+				
+				timeOffset += interval;
+			}
+
+			return result;
 		},
 		
 		
