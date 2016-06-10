@@ -14,6 +14,7 @@ aPackage('nart.gl.shader.picking', () => {
 
 		this.setFramebuffer(this.fb);
 		gl.bindFramebuffer(gl.FRAMEBUFFER, this.fb);
+		
 		mat4.identity(b.modelViewMatrix);
 		
 		gl.bindTexture(gl.TEXTURE_2D, this.rttTexture);
@@ -28,35 +29,33 @@ aPackage('nart.gl.shader.picking', () => {
 		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.rttTexture, 0);
 		gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.renderbuffer);
 		
-		this.colorCounter = 0;
+		this.colorCounter = 0xff0000;
 		this.idMap = {};
 		
 		this.projectionMatrix.set(b.projectionMatrix)
 	}
 	
 	var drawWithMatrix = (time, t, s, m) => {
+		var gl = t.gl;
+		
 		t.withTranslatedMatrix(t.viewMatrix, m, s, m => {
-			if(s.childShapes){
-				var c = s.childShapes;
-				for(var i in c) drawWithMatrix(t, c[i], m);
-			} else {
-				var gl = t.gl;
+			var id = ++t.colorCounter;
+			
+			var prims = s.getPrimitives(time);
+			for(var i = 0; i < prims.length; i++){
+				var p = prims[i];
 				
-				var id = ++t.colorCounter;
 				t.idMap[id] = s.id;
 				
 				// TODO: too many arithmetic for JS-side
 				t.color.set([((id & 0xff0000) >> 16) / 255, ((id & 0x00ff00) >> 8) / 255, (id & 0x0000ff) / 255, 1]);
-				t.vertexPosition.set(s.vertex);
+				t.vertexPosition.set(p.vertex);
 				
-				if(s.vertexIndex){
-					gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, s.vertexIndex)
-					gl.drawElements(s.shapeType, s.vertexIndex.numItems, gl.UNSIGNED_SHORT, 0);
-				} else {
-					t.gl.drawArrays(s.shapeType, 0, t[t.countingBufferName].count)
-				}
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.vertexIndex)
+				gl.drawElements(gl.TRIANGLES, p.vertex.numItems, gl.UNSIGNED_SHORT, 0);
 			}
 		})
+		
 	}
 	
 	var draw = function(time, s, b){ 

@@ -6,7 +6,8 @@
 		},
 		source: { // as game engine could consume
 			texture: 'textures',
-			shape: 'shapes'
+			shape: 'shapes',
+			model: 'models'
 		}
 	},
 	
@@ -15,5 +16,9 @@
 			{ /* single operation with default paths */ }
 			// ,{ raw: { texture: '...', shape: '...' }, source: { ... } }
 		]
+	},
+	
+	animatingTool: {
+		port: 8082
 	}
 }

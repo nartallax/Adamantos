@@ -11,7 +11,7 @@ aPackage('nart.net.http.server', () => {
 	var Server = function(port, host, maxConnections){
 		if(!(this instanceof Server)) return new Server(port);
 		this.port = port || 0; // 0 - special value for random port. see node http docs
-		this.host = host || '127.0.0.1';
+		this.host = host || null;
 		this.maxConnections = maxConnections || 0x7ff;
 		this.onRequest = new Event();
 		this.processRequest = (req, res) => {

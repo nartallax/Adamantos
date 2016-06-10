@@ -26,8 +26,6 @@ require(__dirname + "/../libs/meta/addict.js")
 	.main(() => {
 		"use strict";
 		
-		var config 
-		
 		var launchTime = new Date().getTime();
 		var success = 0, total = 0;
 		var onWorkDone = () => {

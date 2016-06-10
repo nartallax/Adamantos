@@ -8,13 +8,14 @@ aPackage('nart.gl.shader.typical', () => {
 	var clear = function(b){
 		
 		this.setFramebuffer(null);
+		this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
 		this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 		
 		mat4.identity(b.modelViewMatrix);
 		
 		this.projectionMatrix.set(b.projectionMatrix)
 		
-		b.ambientColorBuffer && this.ambientColor.set(b.ambientColorBuffer);
+		this.ambientColor.set(b.ambientColorBuffer || [0, 0, 0]);
 	}
 	
 	var drawWithMatrix = (time, t, s, m) => {
@@ -36,24 +37,6 @@ aPackage('nart.gl.shader.typical', () => {
 				
 				gl.drawElements(gl.TRIANGLES, p.vertex.numItems, gl.UNSIGNED_SHORT, 0);
 			}
-			/*
-			if(s.childShapes){
-				var c = s.childShapes;
-				for(var i in c) drawWithMatrix(t, c[i], m);
-			} else {
-				t.vertexPosition.set(s.vertex);
-				
-				gl.activeTexture(gl.TEXTURE0);
-				gl.bindTexture(gl.TEXTURE_2D, s.texture.getFrame());
-				
-				t.highlightColor.set(s.highlightColor || [0, 0, 0]);
-			
-				t.textureIndex.set(s.textureIndex);
-				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, s.vertexIndex);
-				
-				gl.drawElements(gl.TRIANGLES, s.vertexIndex.numItems, gl.UNSIGNED_SHORT, 0);
-			}
-			*/
 		})
 	}
 	
@@ -110,9 +93,6 @@ aPackage('nart.gl.shader.typical', () => {
 		{name: 'ambientColor', innerName: 'uAmbientColor', isUniform: true, width: 3,},
 		{name: 'highlightColor', innerName: 'uHighlightColor', isUniform: true, width: 3},
 		
-		// TODO: make many directional lights possible
-		//{name: 'lightingDirection', innerName: 'uLightingDirection', isUniform: true, width: 3},
-		//{name: 'lightingColor', innerName: 'uDirectionalColor', isUniform: true, width: 3}
 	], clear, draw);
 	
 });

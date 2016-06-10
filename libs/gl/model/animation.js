@@ -1,6 +1,6 @@
 aPackage('nart.gl.model.animation', () => {
 
-	var Animation = function(model, parts, frames){
+	var Animation = function(model){
 		this.model = model;
 		
 		this.parts = {};
@@ -8,19 +8,13 @@ aPackage('nart.gl.model.animation', () => {
 		
 		this.realFrames = null;
 		this.realFrameInterval = null;
-		
-		parts && this.setParts(parts);
-		frames && frames.forEach(frame => this.addFrame(frame));
 	};
 	
 	Animation.prototype = {
-		setParts: function(parts){ parts.forEach(name => this.addPart(name)) },
-		setFrames: function(frames){ frames.forEach(frame => this.addFrame(frame)) },
-		
 		addPart: function(name){
 			this.model.getPart(name); // check existence
 			
-			this.parts[name] = Object.keys(this.parts).map(k => this.parts[k]) || [];
+			this.parts[name] = (Object.keys(this.parts).map(k => this.parts[k])[0] || []).map(f => null);
 		},
 		removePart: function(name){
 			delete this.parts[name];
@@ -72,76 +66,54 @@ aPackage('nart.gl.model.animation', () => {
 			this.frameIntervals[index] = interval;
 		},
 		
-		getTransposedFramesIndex: function(){
-			var result = {};
-			Object.keys(this.parts).forEach(name => {
-				var offset = 0, pvals = [];
-				
-				this.parts[name].forEach((v, findex) => {
-					(v !== null) && pvals.push({time: offset, value: v});
-					
-					offset += this.frameIntervals[findex];
+		getSortedParts: function(){
+			Object.keys(this.parts)
+				.map(name => ({ name: name, part: this.parts[name] }))
+				.sort((a, b) => {
+					var orderA = this.model.getPart(a.name).getProcessingOrder(this.model.parts),
+						orderB = this.model.getPart(b.name).getProcessingOrder(this.model.parts);
+						
+					return orderA > orderB? 1: orderA < orderB? -1: 0;
 				})
-				
-				result[name] = pvals;
-			});
-				
-			return result;
 		},
 		
-		getPartObjectAt: function(index){ return this.model.parts[this.parts[index]] }
-		
 		getRealFrames: function(interval){
-			checkInterval(interval);
+			this.checkInterval(interval);
 			
-			this.realFrames = [];
-			var totalAnimationLength = this.frames.map(f => f.interval).reduce((a, b) => a + b, 0),
-				tindex = this.getTransposedFramesIndex(),
-				timeOffset = 0;
+			var result = {}, timeOffset = 0,
+				parts = this.getSortedParts(),
+				frameIntervals = this.frameIntervals.map((time, index) => {time: time, index: index}),
+				revFrameIntervals = this.frameIntervals.reverse().map((time, index) => {time: time, index: index}),
 			
-			var getPrevOrCurrentAt = (time, partArr) => {
-				if(partArr.length === 0) return this.getPartObject(partIndex).positioning.getDefaultValue();
-				partArr.reduce((a, b) => b.time > time? a: b)
+			var getPrevOrCurrentAt = (time, partArr, partName) => {
+				if(partArr.length === 0) return this.model.parts[partName].positioning.getDefaultValue();
+				var bestTime = frameIntervals.reduce((a, b) => b.time > time? a: b)
+				return { value: partArr[bestTime.index], time: bestTime.time }
 			}
 			
-			var getNextAt = (time, partArr) => {
-				if(partArr.length === 0) return this.getPartObjectAt(partIndex).positioning.getDefaultValue();
-				partArr.reverse().reduce((a, b) => b.time <= time? a: b)
+			var getNextAt = (time, partArr, partName) => {
+				if(partArr.length === 0) return this.model.parts[partName].positioning.getDefaultValue();
+				var bestTime = revFrameIntervals.reduce((a, b) => b.time <= time? a: b)
+				return { value: partArr[bestTime.index], time: bestTime.time }
 			}
-			
-			while(timeOffset < totalAnimationLength){
-				var positions = {};
-				this.parts.forEach((name, partIndex) => {
-					var prev = getPrevOrCurrentAt(timeOffset, partIndex),
-						next = getNextAt(timeOffset, partIndex);
-					
-					var startTime = prev.time, finishTime = next.time;
-					if(finishTime <= startTime) finishTime += totalAnimationLength
-					var spanLength = finishTime - startTime;
-					
-					positions[name] = this.parts[name].positioning.getPosition(prev.value, next.value, positions);
-				});
-			}
-			
-			
-			
-			
-			var result = {}, timeOffset = 0;
 			
 			Object.keys(this.parts).forEach(name => result[name] = []);
 			
 			while(timeOffset < totalAnimationLength){
 				var positions = {};
 				
-				this.parts.forEach((name, partIndex) => {
-					var prev = getPrevOrCurrentAt(timeOffset, partIndex),
-						next = getNextAt(timeOffset, partIndex);
+				parts.forEach((pair, partIndex) => {
+					var name = pair.name,
+						part = pair.part,
+						prev = getPrevOrCurrentAt(timeOffset, part, name),
+						next = getNextAt(timeOffset, part, name);
 					
 					var startTime = prev.time, finishTime = next.time;
 					if(finishTime <= startTime) finishTime += totalAnimationLength
 					var spanLength = finishTime - startTime;
 					
-					positions[name] = this.parts[name].positioning.getPosition(prev.value, next.value, positions);
+					var realPos = this.parts[name].positioning.getPosition(prev.value, next.value, (timeOffset - startTime) / spanLength, positions);
+					result[name].push(positions[name] = realPos);
 				});
 				
 				timeOffset += interval;

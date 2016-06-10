@@ -15,7 +15,7 @@ aPackage('nart.gl.board', () => {
 	var Board = function(canvas){
 		if(!(this instanceof Board)) return new Board(canvas);
 		
-		this.gl = canvas.getContext("webgl")// || canvas.getContext("experimental-webgl");
+		this.gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
 		this.display = canvas;
 		
 		this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -57,8 +57,7 @@ aPackage('nart.gl.board', () => {
 			mat4.perspective(45, this.gl.viewportWidth / this.gl.viewportHeight, 0.1, 100.0, this.projectionMatrix);
 		},
 		drawWithProgram: function(p){
-			return this.clearWithProgram(p).drawChildrenWithProgram(p)
-			
+			return this.clearWithProgram(p).drawChildrenWithProgram(p)		
 		},
 		drawChildrenWithProgram: function(s){
 			s.activate();
@@ -111,11 +110,13 @@ aPackage('nart.gl.board', () => {
 			
 			this.drawWithProgram(this.pickingShaderProgram)
 			
-			this.gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, color);
+			this.gl.readPixels(x, this.gl.viewportHeight - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, color);
 			
 			var id = (color[0] << 16) | (color[1] << 8) | color[2]
 			
 			return this.pickingShaderProgram.shaderPack.idMap[id];
+			
+			return undefined;
 		},
 	};
 

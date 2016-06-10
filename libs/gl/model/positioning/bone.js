@@ -11,8 +11,13 @@ aPackage('nart.gl.model.positioning.bone', () => {
 	
 	BonePositioning.prototype = {
 		getDefaultValue: function(){ return this.def },
+		
 		getPosition: function(valA, valB, percentage, otherPositions){
 			throw new Error('WOOT');
+		},
+		
+		getProcessingOrder: function(otherParts){
+			return otherParts[this.parent].getProcessingOrder() + 1
 		}
 	};
 	

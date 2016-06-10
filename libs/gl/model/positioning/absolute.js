@@ -26,6 +26,10 @@ aPackage('nart.gl.model.positioning.absolute', () => {
 				rotY: avg(valA.rotY, valB.rotY, percentage),
 				rotZ: avg(valA.rotZ, valB.rotZ, percentage)
 			}
+		},
+		
+		getProcessingOrder: function(otherParts){
+			return 0;
 		}
 	};
 	
