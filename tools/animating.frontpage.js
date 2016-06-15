@@ -207,6 +207,7 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 	}
 	
 	var addAnimation = () => {
+		
 	}
 	
 	var distance = function(/* vararg */){
@@ -239,8 +240,10 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 				
 				var rotX = board.cam.rotX + ((-d.x / 5) * (Math.PI / 180)),
 					rotY = board.cam.rotY + ((-d.y / 5) * (Math.PI / 180));
-					
+				
 				rotY = max(min(rotY, Math.PI / 2), - Math.PI / 2);
+				
+				var yDiff = board.cam.y - (dist * (-Math.sin(board.cam.rotY)));
 				
 				board.cam.rotX = rotX;
 				board.cam.rotY = rotY;
@@ -248,7 +251,8 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 				board.cam.z = dist * Math.cos(rotX) * Math.cos(rotY);
 				board.cam.x = dist * Math.sin(rotX) * Math.cos(rotY);
 				
-				board.cam.y = dist * (-Math.sin(rotY));
+				
+				board.cam.y = yDiff + (dist * (-Math.sin(rotY)));
 				
 				return stopTheEvent(e);
 			}
@@ -289,11 +293,18 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		}
 		
 		display.onwheel = e => {
-			var mult = e.wheelDelta > 0? 1.05: 0.95;
+			var add = (e.wheelDelta > 0? 1: -1) * 0.1
+			var mult = 1 + (add / 2);
 			
-			board.cam.x *= mult;
-			board.cam.y *= mult;
-			board.cam.z *= mult;
+			if(e.ctrlKey){
+				board.cam.y += add;
+			} else {
+				board.cam.x *= mult;
+				board.cam.y *= mult;
+				board.cam.z *= mult;
+			}
+			
+			return stopTheEvent(e);
 		}
 	}
 		
@@ -418,6 +429,7 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			var lighten = id => board.children[id].setHighlightColor(hoverColor);
 			var darken = id => board.children[id].setHighlightColor(defaultHighlight);
 			
+			/*
 			board.afterTick.listen(d => {
 				var id;
 				
@@ -432,13 +444,16 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 				
 			});
 			
+			
 			display.onmousemove = e => {
 
 				mouseX = e.offsetX;
 				mouseY = e.offsetY;
 			}
+			*/
 			
-			board.setAmbientColor([0.7, 0.7, 0.7]).start();
+			//board.setAmbientColor([0.7, 0.7, 0.7]).start();
+			board.setAmbientColor([1, 1, 1]).start();
 		
 		}
 	}
