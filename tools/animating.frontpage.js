@@ -1,4 +1,5 @@
 aPackage('nart.adamantos.tools.animating.frontpage', () => {
+	'use strict';
 
 	var log = aRequire('nart.util.log'),
 		Shape = aRequire('nart.gl.shape'),
@@ -61,22 +62,93 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		
 		return display;
 	}
+	
+	var shapeContainer, display, board, shapeIndex = 0, texLoader, shapeLoader;
 		
-	var shapeContainer, display;
+	// действия с шейпами
+	// id шейпа = его порядковый номер в списке
+	var removeShape = num => {
+		var sh = getShape(num);
+		shapeContainer.removeChild(sh);
+	}
+	var actualizeShape = num => {
+		var sh = getShape(num), data = sh.getData(), bId = sh.boardId;
 		
-	var addShape, changeShapeType, removeShape;
+		bId && (board.removeChild(bId));
+		
+		var bShape;
+		try {
+			bShape = shapeLoader.get(data.shapeName);
+		} catch(e){
+			console.log(e);
+			return;
+		}
+		
+		board.addChild(bShape);
+		bShape.x = data.x;
+		bShape.y = data.y;
+		bShape.z = data.z;
+		
+		sh.boardId = bShape.id;
+	}
+	var addShape = () => {
+		var shapeTag = tag('div', { style: 'position: relative; border: 1px solid #999; margin: 3px 0px' }), 
+			shapeNum = shapeIndex++,
+			update = () => setTimeout(() => actualizeShape(shapeNum), 1);
+		
+		var input = (style, placeholder, type, onclick) => tag('input', {
+			type: type || 'text', style: style, placeholder: placeholder, onchange: update, onkeypress: update, onclick: onclick || (() => {})
+		});
+		
+		shapeTag.appendChild(shapeTag.partNameInput = input('display: block; width: 100%', 'part_name_goes_here'));
+		shapeTag.appendChild(shapeTag.shapeNameInput = input('display: block; width: 100%', 'shape.name.goes.here'));
+		shapeTag.appendChild(shapeTag.animationTypeInput = tag('select', { value: 'absolute', onchange: update, children: [
+				tag('option', {value: 'absolute', text: 'absolute'}),
+				tag('option', {value: 'bone', text: 'bone'}),
+		]}));
+		shapeTag.appendChild(shapeTag.xInput = input('width: 50px', 'x', 'number'));
+		shapeTag.appendChild(shapeTag.yInput = input('width: 50px', 'y', 'number'));
+		shapeTag.appendChild(shapeTag.zInput = input('width: 50px', 'z', 'number'));
+		shapeTag.appendChild(shapeTag.deleteButton = tag('input', {
+			type:'button', value: 'delete', style:'position: absolute; right: 0px; bottom: 0px;', 
+			onclick: () => removeShape(shapeNum)
+		}));
+		shapeTag.num = shapeNum;
+		
+		shapeTag.getData = () => ({
+			shapeName: shapeTag.shapeNameInput.value || '',
+			partName: shapeTag.partNameInput.value || '',
+			animationType: shapeTag.animationTypeInput.value,
+			
+			x: parseFloat(shapeTag.xInput.value || '0'),
+			y: parseFloat(shapeTag.yInput.value || '0'),
+			z: parseFloat(shapeTag.zInput.value || '0')
+		});
+		
+		shapeContainer.appendChild(shapeTag);
+	}
+	var getShape = num => {
+		var chs = shapeContainer.children;
+		for(var i = 0; i < chs.length; i++){
+			if(chs[i].num === num) return chs[i];
+		}
+	}
+	
 		
 	var createInitialContainers = () => {
-		shapeContainer = tag('div', {
-			style: 'position: absolute; left: 0px; bottom: 0px; right: 0px; top: 0px',
+		var shapeContWrap = tag('div', {
+			style: 'position: absolute; left: 0px; bottom: 0px; right: 0px; top: 20px',
 			children: [
-				tag('input', {type: 'button', value: 'add shape', onclick: () => addShape()})
+				(shapeContainer = tag('div', {
+					style: 'position: absolute; top: 0px; left: 0px; right: 0px; bottom: 35px; border: 1px solid #999; overflow-y: auto; overflow-x: hidden'
+				})),
+				tag('input', {type: 'button', value: 'add shape', onclick: addShape, style: 'position: absolute; bottom: 5px; right: 5px; height: 25px;'})
 			]
 		});
 		
 		var wrap = tag('div', {
 			style: 'position: absolute; left: 0px; bottom: 0px; top: 0px; width: 30%;',
-			children: [shapeContainer]
+			children: [shapeContWrap]
 		});
 		
 		document.body.appendChild(wrap);
@@ -87,14 +159,14 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		
 		resetCss();
 		createInitialContainers();
-		var board = Board(createDisplay());
+		board = Board(createDisplay());
 		
 		
 		
 		var gl = board.gl;
 		
-		var texLoader = new TextureLoader(gl),
-			shapeLoader = new ShapeLoader(gl, texLoader);
+		texLoader = new TextureLoader(gl);
+		shapeLoader = new ShapeLoader(gl, texLoader);
 		
 		texLoader.downloadAndAddPack('/get_texture_pack', () => {
 			log("Received the texture pack.");
@@ -111,16 +183,6 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		
 			log('Preloaded');
 
-			var clones = [];
-				
-			var clz = shapeLoader.get('robot.humanoid.basic.torso.lower');
-			clz.z = -1.0;
-			clz.x = 0;
-			clz.rotX = 0.5;
-			board.addChild(clz);
-			clones.push(clz);
-			setInterval(() => { clz.rotY += 0.025 }, 1000 / 60);
-			
 			var mouseX = 0, mouseY = 0;
 			
 			var highlighted = undefined;
@@ -144,24 +206,12 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			});
 			
 			display.onmousemove = e => {
-				//console.log(e);
+
 				mouseX = e.offsetX;
 				mouseY = e.offsetY;
 			}
 			
 			board.setAmbientColor([0.7, 0.7, 0.7]).start();
-			
-			addShape = (id, name) => {
-				var s;
-				try {
-					s = shapeLoader.get(id);
-				} catch(e){
-					console.log(e);
-					alert(e);
-				}
-				
-				board.addChild(s);
-			}
 		
 		}
 	}

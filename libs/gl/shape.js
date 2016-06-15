@@ -23,7 +23,7 @@ aPackage('nart.gl.shape', () => {
 		
 		this.id = getId();
 	}, {
-		clone: function(){ return new this.class(this) },
+		clone: function(){ return new this.class(this) }
 	})
 	
 	return Shape;

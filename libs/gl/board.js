@@ -90,8 +90,8 @@ aPackage('nart.gl.board', () => {
 			this.afterTick.fire();
 		},
 		
-		addChild: function(shape){ return this.children[shape.id] = shape, this },
-		removeChild: function(shape){ delete this.children[shape.id]; return this },
+		addChild: function(shape){ this.children[shape.id] = shape},
+		removeChild: function(shape){ delete this.children[shape.id || shape] },
 		
 		setAmbientColor: function(b){
 			return this.ambientColorBuffer = b, this//(bufferOf(this.gl, b, 3, this.gl.ARRAY_BUFFER, Float32Array) || null), this
