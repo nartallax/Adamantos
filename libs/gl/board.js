@@ -29,6 +29,15 @@ aPackage('nart.gl.board', () => {
 		this.projectionMatrix = mat4.create();
 		this.modelViewMatrix = mat4.create();
 		
+		this.cam = {
+			x: 0,
+			y: 0,
+			z: 0,
+			
+			rotX: 0,
+			rotY: 0
+		}
+		
 		this.isRunning = false;
 		this.children = {};
 		
@@ -69,6 +78,11 @@ aPackage('nart.gl.board', () => {
 		
 			p.activate();
 			
+			mat4.identity(this.modelViewMatrix);
+			mat4.rotate(this.modelViewMatrix, -this.cam.rotY, [1, 0, 0]);
+			mat4.rotate(this.modelViewMatrix, -this.cam.rotX, [0, 1, 0]);
+			mat4.translate(this.modelViewMatrix, [-this.cam.x, -this.cam.y, -this.cam.z]);
+			
 			((this.ticksPassed % this.viewportActualizationFrequency) === 0) && this.actualizeViewport();
 			
 			p.clear(this);
@@ -91,7 +105,7 @@ aPackage('nart.gl.board', () => {
 		},
 		
 		addChild: function(shape){ this.children[shape.id] = shape},
-		removeChild: function(shape){ delete this.children[shape.id || shape] },
+		removeChild: function(shape){ delete this.children[shape? shape.id || shape: shape] },
 		
 		setAmbientColor: function(b){
 			return this.ambientColorBuffer = b, this//(bufferOf(this.gl, b, 3, this.gl.ARRAY_BUFFER, Float32Array) || null), this

@@ -11,8 +11,6 @@ aPackage('nart.gl.shader.typical', () => {
 		this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
 		this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 		
-		mat4.identity(b.modelViewMatrix);
-		
 		this.projectionMatrix.set(b.projectionMatrix)
 		
 		this.ambientColor.set(b.ambientColorBuffer || [0, 0, 0]);

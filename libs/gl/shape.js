@@ -21,9 +21,19 @@ aPackage('nart.gl.shape', () => {
 		this.rotY = data.rotY || 0;
 		this.rotZ = data.rotZ || 0;
 		
+		/*
+		this.sizeX = this.getXSize();
+		this.sizeY = this.getYSize();
+		this.sizeZ = this.getZSize();
+		*/
 		this.id = getId();
 	}, {
-		clone: function(){ return new this.class(this) }
+		clone: function(){ return new this.class(this) },
+		/*
+		getXSize: function(){ throw 'Not implemented.' },
+		getYSize: function(){ throw 'Not implemented.' },
+		getZSize: function(){ throw 'Not implemented.' }
+		*/
 	})
 	
 	return Shape;

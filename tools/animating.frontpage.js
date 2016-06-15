@@ -53,7 +53,7 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		}
 	}
 	var createDisplay = () => {
-		display = tag("canvas", {style:'position: absolute; right: 0px; left: 30%; top: 0px; bottom: 0px; height: 100%; width: 70%'});
+		window.display = display = tag("canvas", {style:'position: absolute; right: 0px; left: 30%; top: 0px; bottom: 0px; height: 100%; width: 70%'});
 		
 		display.setAttribute('width', display.width = document.body.scrollWidth);
 		display.setAttribute('height', display.height = document.body.scrollHeight);
@@ -63,18 +63,30 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		return display;
 	}
 	
-	var shapeContainer, display, board, shapeIndex = 0, texLoader, shapeLoader;
+	var activeColor = [0.3, 0.3, 0.3], hoverColor = [0.15, 0.15, 0.15], defaultHighlight = [0, 0, 0];
+	var shapeContainer, animationContainer, display, board, shapeIndex = 0, texLoader, shapeLoader, shapeUnderCursorId;
+		
+	var lockPointer = () => {
+		display.requestPointerLock? display.requestPointerLock():
+		display.webkitRequestPointerLock? display.webkitRequestPointerLock():
+		display.mozRequestPointerLock? display.webkitRequestPointerLock(): null;
+	}
+	var unlockPointer = () => {
+		document.exitPointerLock? document.exitPointerLock():
+		document.webkitExitPointerLock? document.webkitExitPointerLock():
+		document.mozExitPointerLock? document.webkitExitPointerLock(): null;
+	}
 		
 	// действия с шейпами
-	// id шейпа = его порядковый номер в списке
 	var removeShape = num => {
 		var sh = getShape(num);
+		board.removeChild(sh.boardId);
 		shapeContainer.removeChild(sh);
 	}
 	var actualizeShape = num => {
 		var sh = getShape(num), data = sh.getData(), bId = sh.boardId;
 		
-		bId && (board.removeChild(bId));
+		board.removeChild(sh.boardId);
 		
 		var bShape;
 		try {
@@ -85,16 +97,80 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		}
 		
 		board.addChild(bShape);
-		bShape.x = data.x;
-		bShape.y = data.y;
-		bShape.z = data.z;
-		
 		sh.boardId = bShape.id;
+		
+		switch(data.animationType){
+			case 'absolute':
+				bShape.x = data.x;
+				bShape.y = data.y;
+				bShape.z = data.z;
+				bShape.rotX = data.rotX;
+				bShape.rotY = data.rotY;
+				bShape.rotZ = data.rotZ;
+				break;
+			case 'bone':
+			default: throw new Error('Unknown animation type: "' + data.animationType + '"');
+		}
 	}
 	var addShape = () => {
 		var shapeTag = tag('div', { style: 'position: relative; border: 1px solid #999; margin: 3px 0px' }), 
 			shapeNum = shapeIndex++,
 			update = () => setTimeout(() => actualizeShape(shapeNum), 1);
+		
+		var addXYZInputs = wrap => {
+			var subwrap = tag('div'),
+				x = input('width: 50px', 'x'),
+				y = input('width: 50px', 'y'),
+				z = input('width: 50px', 'z');
+						
+			subwrap.appendChild(x);
+			subwrap.appendChild(y);
+			subwrap.appendChild(z);
+			wrap.appendChild(subwrap);
+			
+			return d => {
+				d.x = parseFloat(x.value.replace(',', '.') || '0');
+				d.y = parseFloat(y.value.replace(',', '.') || '0');
+				d.z = parseFloat(z.value.replace(',', '.') || '0');
+				return d;
+			};
+		}
+		var addXYZRotInputs = wrap => {
+			var subwrap = tag('div'),
+				x = input('width: 50px', 'rot x'),
+				y = input('width: 50px', 'rot y'),
+				z = input('width: 50px', 'rot z');
+						
+			subwrap.appendChild(x);
+			subwrap.appendChild(y);
+			subwrap.appendChild(z);
+			wrap.appendChild(subwrap);
+			
+			return d => {
+				d.rotX = parseFloat(x.value.replace(',', '.') || '0');
+				d.rotY = parseFloat(y.value.replace(',', '.') || '0');
+				d.rotZ = parseFloat(z.value.replace(',', '.') || '0');
+				return d;
+			};
+		}
+		
+		var createFieldsForType = () => {
+			var type = shapeTag.animationTypeInput.value, wrap = shapeTag.typeInputWrap;
+			
+			wrap.innerHTML = '';
+		
+			switch(type){
+				case 'absolute':
+					var addXYZ = addXYZInputs(wrap),
+						addRot = addXYZRotInputs(wrap);
+						
+					wrap.populateWithValues = d => addXYZ(addRot(d));
+					break;
+				case 'bone':
+				
+				default: throw new Error('Unknown animation type: "' + type + '"');
+			}
+		}
 		
 		var input = (style, placeholder, type, onclick) => tag('input', {
 			type: type || 'text', style: style, placeholder: placeholder, onchange: update, onkeypress: update, onclick: onclick || (() => {})
@@ -102,28 +178,24 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		
 		shapeTag.appendChild(shapeTag.partNameInput = input('display: block; width: 100%', 'part_name_goes_here'));
 		shapeTag.appendChild(shapeTag.shapeNameInput = input('display: block; width: 100%', 'shape.name.goes.here'));
-		shapeTag.appendChild(shapeTag.animationTypeInput = tag('select', { value: 'absolute', onchange: update, children: [
+		shapeTag.appendChild(shapeTag.animationTypeInput = tag('select', { value: 'absolute', onchange: createFieldsForType, children: [
 				tag('option', {value: 'absolute', text: 'absolute'}),
 				tag('option', {value: 'bone', text: 'bone'}),
 		]}));
-		shapeTag.appendChild(shapeTag.xInput = input('width: 50px', 'x', 'number'));
-		shapeTag.appendChild(shapeTag.yInput = input('width: 50px', 'y', 'number'));
-		shapeTag.appendChild(shapeTag.zInput = input('width: 50px', 'z', 'number'));
+		shapeTag.appendChild(shapeTag.typeInputWrap = tag('div', {style: 'display: inline-block'}));
 		shapeTag.appendChild(shapeTag.deleteButton = tag('input', {
 			type:'button', value: 'delete', style:'position: absolute; right: 0px; bottom: 0px;', 
 			onclick: () => removeShape(shapeNum)
 		}));
 		shapeTag.num = shapeNum;
 		
-		shapeTag.getData = () => ({
+		shapeTag.getData = () => shapeTag.typeInputWrap.populateWithValues({
 			shapeName: shapeTag.shapeNameInput.value || '',
 			partName: shapeTag.partNameInput.value || '',
-			animationType: shapeTag.animationTypeInput.value,
-			
-			x: parseFloat(shapeTag.xInput.value || '0'),
-			y: parseFloat(shapeTag.yInput.value || '0'),
-			z: parseFloat(shapeTag.zInput.value || '0')
+			animationType: shapeTag.animationTypeInput.value
 		});
+		
+		createFieldsForType();
 		
 		shapeContainer.appendChild(shapeTag);
 	}
@@ -134,22 +206,164 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		}
 	}
 	
+	var addAnimation = () => {
+	}
+	
+	var distance = function(/* vararg */){
+		var res = arguments[0];
+		for(var i = 1; i < arguments.length; i++){
+			res = Math.sqrt((res * res) + (arguments[i] * arguments[i]))
+		}
+		return res;
+	}
+	var min = (a, b) => a < b? a: b,
+		max = (a, b) => a < b? b: a;
+	var mouseMovement = (e, old) => ({
+		x: 'movementX' in e? e.movementX: 'mozMovementX' in e? e.mozMovementX: 'webkitMovementX' in e? e.webkitMovementX: old.x - e.screenX,
+		y: 'movementY' in e? e.movementY: 'mozMovementY' in e? e.mozMovementY: 'webkitMovementX' in e? e.webkitMovementY: old.x - e.screenY
+	})
+	var listenToUserInput = () => {
+		var stopTheEvent = e => (
+			(e.preventDefault && e.preventDefault()), 
+			(e.stopImmediatePropagation && e.stopImmediatePropagation()),
+			(e.returnValue = false),
+			(e.stopPropagation && e.stopPropagation()),
+			false
+		);
+		
+		var mouseIsAttached = false,
+			dragStartCursor,
+			mouseListener = e => {
+				var d = mouseMovement(e, dragStartCursor),
+					dist = distance(board.cam.x, board.cam.z, board.cam.y);
+				
+				var rotX = board.cam.rotX + ((-d.x / 5) * (Math.PI / 180)),
+					rotY = board.cam.rotY + ((-d.y / 5) * (Math.PI / 180));
+					
+				rotY = max(min(rotY, Math.PI / 2), - Math.PI / 2);
+				
+				board.cam.rotX = rotX;
+				board.cam.rotY = rotY;
+				
+				board.cam.z = dist * Math.cos(rotX) * Math.cos(rotY);
+				board.cam.x = dist * Math.sin(rotX) * Math.cos(rotY);
+				
+				board.cam.y = dist * (-Math.sin(rotY));
+				
+				return stopTheEvent(e);
+			}
+		
+		document.body.onkeydown = e => {
+			switch(String.fromCharCode(e.keyCode).toLowerCase()){
+				//case 'w':
+					//board.camRotX += 0.001;
+					//break;
+				default: return;
+			}
+			
+			return stopTheEvent(e);
+		}
+		
+		display.oncontextmenu = display.onmousedown = e => {
+			if(e.button === 0) { // left mouse button
+				console.log(shapeUnderCursorId);
+			} else { // handle all other buttons the same way
+				document.onmousemove = mouseListener;
+				
+				dragStartCursor = { x: e.screenX, y: e.screenY };
+				
+				lockPointer();
+				
+				mouseIsAttached = true;
+			}
+			return stopTheEvent(e);
+		}
+		
+		document.onmouseup = e => {
+			if(mouseIsAttached){
+				unlockPointer();
+				document.onmousemove = null;
+				mouseIsAttached = false;
+				return stopTheEvent(e);
+			}
+		}
+		
+		display.onwheel = e => {
+			var mult = e.wheelDelta > 0? 1.05: 0.95;
+			
+			board.cam.x *= mult;
+			board.cam.y *= mult;
+			board.cam.z *= mult;
+		}
+	}
 		
 	var createInitialContainers = () => {
-		var shapeContWrap = tag('div', {
-			style: 'position: absolute; left: 0px; bottom: 0px; right: 0px; top: 20px',
+		var activeTab = null, activeTabBtn = null;
+		
+		var activateTabFn = (tab, button) => {
+			tab.style.display = 'none';
+			button.style.background = '#ccc';
+			button.style.cursor = 'pointer';
+			
+			return () => {
+				activeTab && (activeTab.style.display = 'none');
+				activeTabBtn && (activeTabBtn.style.background = '#ccc');
+				tab.style.display = 'block';
+				button.style.background = '#fff';
+				activeTab = tab;
+				activeTabBtn = button;
+			}
+		}
+		
+		var tabTag = (inner, lower) => {
+			inner.style.position = 'absolute';
+			inner.style.top = inner.style.left = inner.style.right = '0px';
+			inner.style.bottom = '35px';
+			inner.style.border = '1px solid #999';
+			inner.style.overflowY = 'auto';
+			inner.style.overflowX = 'hidden';
+			return tag('div', {
+				style: 'position: absolute; left: 0px; bottom: 0px; right: 0px; top: 20px',
+				children: [
+					inner,
+					tag('div', {
+						style: 'position: absolute; left: 0px; bottom: 0px; height: 35px; right: 0px; text-align: right',
+						children: Array.isArray(lower)? lower: [lower]
+					})
+				]
+			});
+		}
+		
+		var tabBtn = (tab, text) => {
+			var res = tag('div', { text: text, style: 'font-weight: bold; height: 20px; display: inline-block; width: auto; padding: 0px 3px; border: 1px solid #999; border-width: 0px 1px' });
+			var fn = activateTabFn(tab, res);
+			res.onclick = fn;
+			return res;
+		}
+		
+		var shapeContWrap = tabTag(
+			shapeContainer = tag('div'),
+			tag('input', {type: 'button', value: 'add shape', onclick: addShape, style: 'margin: 5px; height: 25px;'})
+		)
+		
+		var animContWrap = tabTag(
+			animationContainer = tag('div'),
+			tag('input', {type: 'button', value: 'add animation', onclick: addAnimation, style: 'margin: 5px; height: 25px;'})
+		)
+		
+		var wrap = tag('div', {
+			style: 'position: absolute; left: 0px; bottom: 0px; top: 0px; width: 30%; background: #ccc',
 			children: [
-				(shapeContainer = tag('div', {
-					style: 'position: absolute; top: 0px; left: 0px; right: 0px; bottom: 35px; border: 1px solid #999; overflow-y: auto; overflow-x: hidden'
-				})),
-				tag('input', {type: 'button', value: 'add shape', onclick: addShape, style: 'position: absolute; bottom: 5px; right: 5px; height: 25px;'})
+				shapeContWrap, 
+				animContWrap,
+				tag('div', {style:'position: absolute; top: 0px; left: 0px; right: 0px; height: 20px', children: [
+					(activeTabBtn = tabBtn(shapeContWrap, 'shapes')),
+					tabBtn(animContWrap, 'animations')
+				]})
 			]
 		});
 		
-		var wrap = tag('div', {
-			style: 'position: absolute; left: 0px; bottom: 0px; top: 0px; width: 30%;',
-			children: [shapeContWrap]
-		});
+		activeTabBtn.onclick();
 		
 		document.body.appendChild(wrap);
 	}
@@ -160,8 +374,22 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		resetCss();
 		createInitialContainers();
 		board = Board(createDisplay());
+		listenToUserInput();
 		
 		
+		var dist = distance(3, 3, 3),
+			rotX = (45 * Math.PI) / 180,
+			rotY = -(45 * Math.PI) / 180
+		
+		board.cam.rotX = rotX;
+		board.cam.rotY = rotY;
+		
+		board.cam.z = dist * Math.cos(rotX) * Math.cos(rotY);
+		board.cam.x = dist * Math.sin(rotX) * Math.cos(rotY);
+		
+		board.cam.y = dist * (-Math.sin(rotY));
+		
+		window.board = board;
 		
 		var gl = board.gl;
 		
@@ -186,15 +414,14 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			var mouseX = 0, mouseY = 0;
 			
 			var highlighted = undefined;
-			var highlightColor = [0.3, 0.3, 0.3], defaultHighlight = [0, 0, 0];
 			
-			var lighten = id => board.children[id].setHighlightColor(highlightColor);
+			var lighten = id => board.children[id].setHighlightColor(hoverColor);
 			var darken = id => board.children[id].setHighlightColor(defaultHighlight);
 			
 			board.afterTick.listen(d => {
 				var id;
 				
-				id = board.childAt(mouseX, mouseY);
+				shapeUnderCursorId = id = board.childAt(mouseX, mouseY);
 				
 				if(id === highlighted) return;
 				
