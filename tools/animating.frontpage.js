@@ -236,14 +236,12 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			dragStartCursor,
 			mouseListener = e => {
 				var d = mouseMovement(e, dragStartCursor),
-					dist = distance(board.cam.x, board.cam.z, board.cam.y);
+					dist = distance(board.cam.x, board.cam.z, board.cam.y - (board.cam.yShift || 0));
 				
 				var rotX = board.cam.rotX + ((-d.x / 5) * (Math.PI / 180)),
 					rotY = board.cam.rotY + ((-d.y / 5) * (Math.PI / 180));
 				
 				rotY = max(min(rotY, Math.PI / 2), - Math.PI / 2);
-				
-				var yDiff = board.cam.y - (dist * (-Math.sin(board.cam.rotY)));
 				
 				board.cam.rotX = rotX;
 				board.cam.rotY = rotY;
@@ -252,7 +250,7 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 				board.cam.x = dist * Math.sin(rotX) * Math.cos(rotY);
 				
 				
-				board.cam.y = yDiff + (dist * (-Math.sin(rotY)));
+				board.cam.y = (board.cam.yShift || 0) + (dist * (-Math.sin(rotY)));
 				
 				return stopTheEvent(e);
 			}
@@ -297,10 +295,11 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			var mult = 1 + (add / 2);
 			
 			if(e.ctrlKey){
+				board.cam.yShift = (board.cam.yShift || 0) + add;
 				board.cam.y += add;
 			} else {
 				board.cam.x *= mult;
-				board.cam.y *= mult;
+				board.cam.y = ((board.cam.y - (board.cam.yShift || 0)) * mult) + (board.cam.yShift || 0);
 				board.cam.z *= mult;
 			}
 			
