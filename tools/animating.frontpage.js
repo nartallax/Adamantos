@@ -41,6 +41,30 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		}
 		return result;
 	}
+	var input = (style, placeholder, update, type, onclick) => tag('input', {
+		type: type || 'text', style: style, placeholder: placeholder, onchange: update, onkeypress: update, onclick: onclick || (() => {})
+	});
+	var addXYZInputs = (wrap, update, placeholderPrefix, dataPrefix) => {
+		placeholderPrefix = placeholderPrefix || ''
+		dataPrefix = dataPrefix || '';
+		
+		var subwrap = tag('div'),
+			x = input('width: 50px', placeholderPrefix + 'x', update),
+			y = input('width: 50px', placeholderPrefix + 'y', update),
+			z = input('width: 50px', placeholderPrefix + 'z', update);
+					
+		subwrap.appendChild(x);
+		subwrap.appendChild(y);
+		subwrap.appendChild(z);
+		wrap.appendChild(subwrap);
+		
+		return d => {
+			d[dataPrefix? dataPrefix + 'X': 'x'] = parseFloat(x.value.replace(',', '.') || '0');
+			d[dataPrefix? dataPrefix + 'Y': 'y'] = parseFloat(y.value.replace(',', '.') || '0');
+			d[dataPrefix? dataPrefix + 'Z': 'z'] = parseFloat(z.value.replace(',', '.') || '0');
+			return d;
+		};
+	}
 		
 	var commonStyle = 'border: 0px; margin: 0px; padding: 0px; width: 100%; height: 100%; position: absolute; background: #ccc; overflow: hidden';
 	var resetCss = () => {
@@ -117,43 +141,6 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			shapeNum = shapeIndex++,
 			update = () => setTimeout(() => actualizeShape(shapeNum), 1);
 		
-		var addXYZInputs = wrap => {
-			var subwrap = tag('div'),
-				x = input('width: 50px', 'x'),
-				y = input('width: 50px', 'y'),
-				z = input('width: 50px', 'z');
-						
-			subwrap.appendChild(x);
-			subwrap.appendChild(y);
-			subwrap.appendChild(z);
-			wrap.appendChild(subwrap);
-			
-			return d => {
-				d.x = parseFloat(x.value.replace(',', '.') || '0');
-				d.y = parseFloat(y.value.replace(',', '.') || '0');
-				d.z = parseFloat(z.value.replace(',', '.') || '0');
-				return d;
-			};
-		}
-		var addXYZRotInputs = wrap => {
-			var subwrap = tag('div'),
-				x = input('width: 50px', 'rot x'),
-				y = input('width: 50px', 'rot y'),
-				z = input('width: 50px', 'rot z');
-						
-			subwrap.appendChild(x);
-			subwrap.appendChild(y);
-			subwrap.appendChild(z);
-			wrap.appendChild(subwrap);
-			
-			return d => {
-				d.rotX = parseFloat(x.value.replace(',', '.') || '0');
-				d.rotY = parseFloat(y.value.replace(',', '.') || '0');
-				d.rotZ = parseFloat(z.value.replace(',', '.') || '0');
-				return d;
-			};
-		}
-		
 		var createFieldsForType = () => {
 			var type = shapeTag.animationTypeInput.value, wrap = shapeTag.typeInputWrap;
 			
@@ -161,23 +148,32 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		
 			switch(type){
 				case 'absolute':
-					var addXYZ = addXYZInputs(wrap),
-						addRot = addXYZRotInputs(wrap);
+					var addXYZ = addXYZInputs(wrap, update),
+						addRot = addXYZInputs(wrap, update, 'rot ', 'rot');
 						
 					wrap.populateWithValues = d => addXYZ(addRot(d));
 					break;
 				case 'bone':
-				
+					var addMults = addXYZInputs(wrap, update, 'mult ', 'mult'),
+						addShifts = addXYZInputs(wrap, update, 'shift ', 'shift'),
+						parentName = input('display: block; width: 150px', 'attach_to_this_part', update),
+						defaultValue = input('display: block; width: 150px', 'default value', update);
+						
+					wrap.appendChild(parentName);
+					wrap.appendChild(defaultValue);
+						
+					wrap.populateWithValues = d => {
+						d.parent = parentName.value;
+						d.defaultValue = parseFloat(defaultValue.value) || 0;
+						return addMults(addShifts(d));
+					}
+					break;
 				default: throw new Error('Unknown animation type: "' + type + '"');
 			}
 		}
 		
-		var input = (style, placeholder, type, onclick) => tag('input', {
-			type: type || 'text', style: style, placeholder: placeholder, onchange: update, onkeypress: update, onclick: onclick || (() => {})
-		});
-		
-		shapeTag.appendChild(shapeTag.partNameInput = input('display: block; width: 100%', 'part_name_goes_here'));
-		shapeTag.appendChild(shapeTag.shapeNameInput = input('display: block; width: 100%', 'shape.name.goes.here'));
+		shapeTag.appendChild(shapeTag.partNameInput = input('display: block; width: 100%', 'part_name_goes_here', update));
+		shapeTag.appendChild(shapeTag.shapeNameInput = input('display: block; width: 100%', 'shape.name.goes.here', update));
 		shapeTag.appendChild(shapeTag.animationTypeInput = tag('select', { value: 'absolute', onchange: createFieldsForType, children: [
 				tag('option', {value: 'absolute', text: 'absolute'}),
 				tag('option', {value: 'bone', text: 'bone'}),
@@ -254,17 +250,6 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 				
 				return stopTheEvent(e);
 			}
-		
-		document.body.onkeydown = e => {
-			switch(String.fromCharCode(e.keyCode).toLowerCase()){
-				//case 'w':
-					//board.camRotX += 0.001;
-					//break;
-				default: return;
-			}
-			
-			return stopTheEvent(e);
-		}
 		
 		display.oncontextmenu = display.onmousedown = e => {
 			if(e.button === 0) { // left mouse button
