@@ -291,12 +291,16 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		}
 		
 		display.onwheel = e => {
-			var add = (e.wheelDelta > 0? 1: -1) * 0.1
-			var mult = 1 + (add / 2);
+			var add = (e.wheelDelta > 0? 1: -1) * 0.05
+			var mult = 1 + add;
 			
 			if(e.ctrlKey){
-				board.cam.yShift = (board.cam.yShift || 0) + add;
-				board.cam.y += add;
+				
+				var dist = distance(board.cam.x, board.cam.z, board.cam.y - (board.cam.yShift || 0))
+				var shift = dist * add;
+				
+				board.cam.yShift = (board.cam.yShift || 0) + shift;
+				board.cam.y += shift;
 			} else {
 				board.cam.x *= mult;
 				board.cam.y = ((board.cam.y - (board.cam.yShift || 0)) * mult) + (board.cam.yShift || 0);

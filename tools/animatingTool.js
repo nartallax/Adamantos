@@ -38,7 +38,7 @@ require(__dirname + "/../libs/meta/addict.js")
 		var html = null;
 		(() => {
 			var client = new htmlAssembler()
-				.setTitle('Adamantos')
+				.setTitle('Animation tool')
 				.setFavicon(__dirname + '/../violet_gem.png')
 				.setMainPackage('nart.adamantos.tools.animating.frontpage');
 				

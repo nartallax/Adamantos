@@ -89,43 +89,12 @@ aPackage('nart.adamantos.client.main', () => {
 				clones.forEach(c => c.rotY += 0.025)
 			}, 1000 / 60);
 			
-			var mouseX = 0, mouseY = 0;
-			
-			var highlighted = undefined;
-			var highlightColor = [0.3, 0.3, 0.3], defaultHighlight = [0, 0, 0];
-			
-			var lighten = id => board.children[id].setHighlightColor(highlightColor);
-			var darken = id => board.children[id].setHighlightColor(defaultHighlight);
-			
-			board.afterTick.listen(d => {
-				fps++;
-				
-				var id;
-				
-				//id = board.childAt(mouseX, mouseY);
-				
-				if(id === highlighted) return;
-				
-				highlighted === undefined || darken(highlighted)
-				id === undefined || lighten(id)
-				
-				highlighted = id
-				
-			});
-			
-			document.body.onmousemove = e => {
-				mouseX = e.clientX;
-				mouseY = e.clientY;
-			}
-			
 			if(true) setTimeout(() => {
 				console.log('stopping');
 				board.stop();
 			}, 5000);
 			
-			board
-				.setAmbientColor([0.7, 0.7, 0.7])
-				.start();
+			board.setAmbientColor([0.7, 0.7, 0.7]).start();
 		
 		}
 		
