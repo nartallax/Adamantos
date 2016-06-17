@@ -14,7 +14,7 @@ aPackage('nart.gl.model.positioning.bone', () => {
 		
 		this.def = defaultValue || 0;
 	};
-	
+	/*
 	var getRotations = (dx, dy, dz) => {
 		var dist = Math.sqrt(Math.sqrt((dx * dx) + (dy * dy)) + (dz * dz));
 		
@@ -22,11 +22,12 @@ aPackage('nart.gl.model.positioning.bone', () => {
 		
 		var ax = 
 	}
-	
+	*/
 	BonePositioning.prototype = {
 		getDefaultValue: function(){ return this.def },
 		
 		getPosition: function(valA, valB, percentage, otherPositions){
+			/*
 			var finVal = valA + ((valA - valB) * percentage);
 			
 			var dist = this.shiftX;
@@ -47,7 +48,8 @@ aPackage('nart.gl.model.positioning.bone', () => {
 			};
 			
 			var iSinX = this.shiftX / dist, iSinY = this.shiftY / dist, iSinZ = this.shiftZ / dist;
-			
+			*/
+			throw 'Not implemented'
 			
 		},
 		

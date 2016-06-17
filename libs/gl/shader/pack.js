@@ -62,7 +62,7 @@ aPackage('nart.gl.shader.pack', () => {
 		}
 	});
 	
-	var ShaderPack = function(gl, vertexCode, fragmentCode, description, clear, draw){
+	var ShaderPack = function(gl, vertexCode, fragmentCode, description, clear, draw, modelMatrixLocationName){
 		if(!(this instanceof ShaderPack)) return new ShaderPack(gl, vertexCode, fragmentCode, description)
 			
 		this.vertexShader = shaderOf(gl, gl.VERTEX_SHADER, vertexCode)
@@ -72,8 +72,9 @@ aPackage('nart.gl.shader.pack', () => {
 		this.gl = gl
 		this.countingBufferName = getCountingBufferName(description)
 		
-		this.draw = draw
+		this.innerDraw = draw
 		this.clear = clear
+		this.modelMatrixLocationName = modelMatrixLocationName;
 	}
 	
 	var shaderOf = (gl, type, code) => {
@@ -92,28 +93,20 @@ aPackage('nart.gl.shader.pack', () => {
 		bindVariables: function(program){
 			this.description.forEach(b => this[b.name] = Buffer.create(this.gl, b.innerName, program, b))
 		},
+		
 		withTranslatedMatrix: function(varLocation, sourceMatrix, shape, body){
-			// TODO optimize copying here
-			var copy = mat4.create();
-			mat4.set(sourceMatrix, copy);
-
-			// TODO become able into matrices and rewrite this unoptimal code
-			mat4.translate(sourceMatrix, [shape.x, shape.y, shape.z]);
-			mat4.rotate(sourceMatrix, shape.rotX, [1, 0, 0]);
-			mat4.rotate(sourceMatrix, shape.rotY, [0, 1, 0]);
-			mat4.rotate(sourceMatrix, shape.rotZ, [0, 0, 1]);
-			
-			varLocation.set(sourceMatrix)
-			
+			varLocation.set(shape.getMatrix())
 			body(sourceMatrix)
-			
-			// TODO optimize copying here too
-			mat4.set(copy, sourceMatrix);
 		},
 		
 		setFramebuffer: function(b){
 			if(b === currentFramebuffer) return;
 			this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, b);
+		},
+		
+		draw: function(time, shape){
+			this[this.modelMatrixLocationName].set(shape.getMatrix());
+			this.innerDraw(time, shape);
 		}
 	};
 	

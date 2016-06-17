@@ -88,7 +88,7 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 	}
 	
 	var activeColor = [0.3, 0.3, 0.3], hoverColor = [0.15, 0.15, 0.15], defaultHighlight = [0, 0, 0];
-	var shapeContainer, animationContainer, display, board, shapeIndex = 0, texLoader, shapeLoader, shapeUnderCursorId;
+	var shapeContainer, animationContainer, display, board, shapeIndex = 0, texLoader, shapeLoader;
 		
 	var lockPointer = () => {
 		display.requestPointerLock? display.requestPointerLock():
@@ -125,12 +125,10 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		
 		switch(data.animationType){
 			case 'absolute':
-				bShape.x = data.x;
-				bShape.y = data.y;
-				bShape.z = data.z;
-				bShape.rotX = data.rotX;
-				bShape.rotY = data.rotY;
-				bShape.rotZ = data.rotZ;
+				bShape.setPosition(data.x, data.y, data.z);
+				bShape.setRotationX(data.rotX);
+				bShape.setRotationY(data.rotY);
+				bShape.setRotationZ(data.rotZ);
 				break;
 			case 'bone':
 			default: throw new Error('Unknown animation type: "' + data.animationType + '"');
@@ -252,17 +250,10 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			}
 		
 		display.oncontextmenu = display.onmousedown = e => {
-			if(e.button === 0) { // left mouse button
-				console.log(shapeUnderCursorId);
-			} else { // handle all other buttons the same way
-				document.onmousemove = mouseListener;
-				
-				dragStartCursor = { x: e.screenX, y: e.screenY };
-				
-				lockPointer();
-				
-				mouseIsAttached = true;
-			}
+			document.onmousemove = mouseListener;
+			dragStartCursor = { x: e.screenX, y: e.screenY };
+			lockPointer();
+			mouseIsAttached = true;
 			return stopTheEvent(e);
 		}
 		
@@ -295,7 +286,20 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			return stopTheEvent(e);
 		}
 	}
+	
+	var resetCam = () => {
+		var dist = distance(3, 3, 3),
+			rotX = (45 * Math.PI) / 180,
+			rotY = -(45 * Math.PI) / 180
 		
+		board.cam.rotX = rotX;
+		board.cam.rotY = rotY;
+		
+		board.cam.z = dist * Math.cos(rotX) * Math.cos(rotY);
+		board.cam.x = dist * Math.sin(rotX) * Math.cos(rotY);
+		
+		board.cam.y = dist * (-Math.sin(rotY));
+	}
 	var createInitialContainers = () => {
 		var activeTab = null, activeTabBtn = null;
 		
@@ -373,27 +377,12 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		resetCss();
 		createInitialContainers();
 		board = Board(createDisplay());
+		
+		resetCam();
 		listenToUserInput();
 		
-		
-		var dist = distance(3, 3, 3),
-			rotX = (45 * Math.PI) / 180,
-			rotY = -(45 * Math.PI) / 180
-		
-		board.cam.rotX = rotX;
-		board.cam.rotY = rotY;
-		
-		board.cam.z = dist * Math.cos(rotX) * Math.cos(rotY);
-		board.cam.x = dist * Math.sin(rotX) * Math.cos(rotY);
-		
-		board.cam.y = dist * (-Math.sin(rotY));
-		
-		window.board = board;
-		
-		var gl = board.gl;
-		
-		texLoader = new TextureLoader(gl);
-		shapeLoader = new ShapeLoader(gl, texLoader);
+		texLoader = new TextureLoader(board.gl);
+		shapeLoader = new ShapeLoader(board.gl, texLoader);
 		
 		texLoader.downloadAndAddPack('/get_texture_pack', () => {
 			log("Received the texture pack.");
@@ -410,6 +399,7 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		
 			log('Preloaded');
 
+			/*
 			var mouseX = 0, mouseY = 0;
 			
 			var highlighted = undefined;
@@ -417,7 +407,6 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			var lighten = id => board.children[id].setHighlightColor(hoverColor);
 			var darken = id => board.children[id].setHighlightColor(defaultHighlight);
 			
-			/*
 			board.afterTick.listen(d => {
 				var id;
 				
@@ -440,8 +429,8 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			}
 			*/
 			
-			//board.setAmbientColor([0.7, 0.7, 0.7]).start();
-			board.setAmbientColor([1, 1, 1]).start();
+			board.setAmbientColor([1, 1, 1]);
+			board.start();
 		
 		}
 	}

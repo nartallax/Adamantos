@@ -31,33 +31,27 @@ aPackage('nart.gl.shader.picking', () => {
 		this.idMap = {};
 		
 		this.projectionMatrix.set(b.projectionMatrix)
+		this.viewMatrix.set(b.viewMatrix)
 	}
 	
-	var drawWithMatrix = (time, t, s, m) => {
-		var gl = t.gl;
+	var draw = function(time, shape){ 
+		var gl = this.gl;
 		
-		t.withTranslatedMatrix(t.viewMatrix, m, s, m => {
-			var id = ++t.colorCounter;
+		var id = ++this.colorCounter;
 			
-			var prims = s.getPrimitives(time);
-			for(var i = 0; i < prims.length; i++){
-				var p = prims[i];
-				
-				t.idMap[id] = s.id;
-				
-				// TODO: too many arithmetic for JS-side
-				t.color.set([((id & 0xff0000) >> 16) / 255, ((id & 0x00ff00) >> 8) / 255, (id & 0x0000ff) / 255, 1]);
-				t.vertexPosition.set(p.vertex);
-				
-				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.vertexIndex)
-				gl.drawElements(gl.TRIANGLES, p.vertex.numItems, gl.UNSIGNED_SHORT, 0);
-			}
-		})
-		
-	}
-	
-	var draw = function(time, s, b){ 
-		return drawWithMatrix(time, this, s, b.modelViewMatrix)
+		var prims = shape.getPrimitives(time);
+		for(var i = 0; i < prims.length; i++){
+			var p = prims[i];
+			
+			this.idMap[id] = shape.id;
+			
+			// TODO: too many arithmetic for JS-side
+			this.color.set([((id & 0xff0000) >> 16) / 255, ((id & 0x00ff00) >> 8) / 255, (id & 0x0000ff) / 255, 1]);
+			this.vertexPosition.set(p.vertex);
+			
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.vertexIndex)
+			gl.drawElements(gl.TRIANGLES, p.vertex.numItems, gl.UNSIGNED_SHORT, 0);
+		}
 	}
 	
 	return gl => new ShaderPack(gl, `
@@ -65,13 +59,14 @@ aPackage('nart.gl.shader.picking', () => {
 		
 		uniform vec4 aVertexColor;
 		
-		uniform mat4 uMVMatrix;
+		uniform mat4 uVMatrix;
+		uniform mat4 uMMatrix;
 		uniform mat4 uPMatrix;
 		
 		varying vec4 vColor;
 		
 		void main() {
-			gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+			gl_Position = uPMatrix * uVMatrix * uMMatrix * vec4(aVertexPosition, 1.0);
 			vColor = aVertexColor;
 		}
 		`,`
@@ -85,8 +80,9 @@ aPackage('nart.gl.shader.picking', () => {
 		`, [
 		{name: 'vertexPosition', innerName: 'aVertexPosition', isCounting: true},
 		{name: 'projectionMatrix', innerName: 'uPMatrix', isUniform: true, width: 4, isMatrix: true},
+		{name: 'modelMatrix', innerName: 'uMVMatrix', isUniform: true, width: 4, isMatrix: true},
 		{name: 'viewMatrix', innerName: 'uMVMatrix', isUniform: true, width: 4, isMatrix: true},
 		{name: 'color', innerName: 'aVertexColor', isUniform: true, width: 4}
-	], clear, draw)
+	], clear, draw, 'modelMatrix')
 	
 });

@@ -27,16 +27,9 @@ aPackage('nart.gl.board', () => {
 		this.pickingShaderProgram = new ShaderProgram(this.gl, PickingShaderPack(this.gl))
 		
 		this.projectionMatrix = mat4.create();
-		this.modelViewMatrix = mat4.create();
+		this.viewMatrix = mat4.create();
 		
-		this.cam = {
-			x: 0,
-			y: 0,
-			z: 0,
-			
-			rotX: 0,
-			rotY: 0
-		}
+		this.cam = {x: 0, y: 0, z: 0, rotX: 0, rotY: 0}
 		
 		this.isRunning = false;
 		this.children = {};
@@ -65,23 +58,22 @@ aPackage('nart.gl.board', () => {
 			this.gl.viewport(0, 0, this.gl.viewportWidth, this.gl.viewportHeight);
 			mat4.perspective(45, this.gl.viewportWidth / this.gl.viewportHeight, 0.1, 100.0, this.projectionMatrix);
 		},
+		
 		drawWithProgram: function(p){
-			return this.clearWithProgram(p).drawChildrenWithProgram(p)		
+			return this.clearWithProgram(p).drawChildrenWithProgram(p)
 		},
 		drawChildrenWithProgram: function(s){
 			s.activate();
-			var timeOffset = msec() - this.startTime;
-			var c = this.children, m = this.modelViewMatrix, pm = this.projectionMatrix;
-			for(var i in c) s.draw(timeOffset, c[i], this);
+			var timeOffset = msec() - this.startTime, c = this.children;
+			Object.keys(c).forEach(id => s.draw(timeOffset, c[id]))
 		},
 		clearWithProgram: function(p){
-		
 			p.activate();
 			
-			mat4.identity(this.modelViewMatrix);
-			mat4.rotate(this.modelViewMatrix, -this.cam.rotY, [1, 0, 0]);
-			mat4.rotate(this.modelViewMatrix, -this.cam.rotX, [0, 1, 0]);
-			mat4.translate(this.modelViewMatrix, [-this.cam.x, -this.cam.y, -this.cam.z]);
+			mat4.identity(this.viewMatrix);
+			mat4.rotate(this.viewMatrix, -this.cam.rotY, [1, 0, 0]);
+			mat4.rotate(this.viewMatrix, -this.cam.rotX, [0, 1, 0]);
+			mat4.translate(this.viewMatrix, [-this.cam.x, -this.cam.y, -this.cam.z]);
 			
 			((this.ticksPassed % this.viewportActualizationFrequency) === 0) && this.actualizeViewport();
 			
@@ -107,15 +99,7 @@ aPackage('nart.gl.board', () => {
 		addChild: function(shape){ this.children[shape.id] = shape},
 		removeChild: function(shape){ delete this.children[shape? shape.id || shape: shape] },
 		
-		setAmbientColor: function(b){
-			return this.ambientColorBuffer = b, this//(bufferOf(this.gl, b, 3, this.gl.ARRAY_BUFFER, Float32Array) || null), this
-		}, 
-		setLightDirection: function(b){
-			return this.lightDirection = b, this
-		}, 
-		setLightColor: function(b){
-			return this.lightColor = b, this
-		},
+		setAmbientColor: function(b){ this.ambientColorBuffer = b, this }, 
 		
 		childAt: function(x, y){
 			var gl = this.gl;
