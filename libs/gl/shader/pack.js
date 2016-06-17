@@ -94,17 +94,18 @@ aPackage('nart.gl.shader.pack', () => {
 			this.description.forEach(b => this[b.name] = Buffer.create(this.gl, b.innerName, program, b))
 		},
 		
-		withTranslatedMatrix: function(varLocation, sourceMatrix, shape, body){
-			varLocation.set(shape.getMatrix())
-			body(sourceMatrix)
-		},
-		
 		setFramebuffer: function(b){
 			if(b === currentFramebuffer) return;
 			this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, b);
 		},
 		
 		draw: function(time, shape){
+			// TODO: there is 3 possible ways of storing/defining the position of the shape:
+			// 1. store only coords and rotations, form the matrix every time it is needed
+			// 2. store coords, rotations and formed matrix, altering it as needed
+			// 3. (?) storing coords, passing them to shader and working with them on shader side
+			// its completely unclear for me what will perform better
+			// when I will opt everything, this is the thing to think of
 			this[this.modelMatrixLocationName].set(shape.getMatrix());
 			this.innerDraw(time, shape);
 		}

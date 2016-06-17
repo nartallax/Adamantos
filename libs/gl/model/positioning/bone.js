@@ -14,25 +14,30 @@ aPackage('nart.gl.model.positioning.bone', () => {
 		
 		this.def = defaultValue || 0;
 	};
-	/*
-	var getRotations = (dx, dy, dz) => {
-		var dist = Math.sqrt(Math.sqrt((dx * dx) + (dy * dy)) + (dz * dz));
+	
+	var dist = (a, b) => Math.sqrt((a * a) + (b * b))
+	
+	var getTransformedPoint = (dx, dy, dz, rotX, rotY, rotZ) => {
+		var totalDist = dist(dist(dx, dy), dz);
 		
-		var sx = dx / dist, sy = dy / dist, sz = dz / dist;
+		rotX += Math.acos(dz / dist(dy, dz));
+		rotY += Math.acos(dz / dist(dx, dz));
+		rotZ += Math.acos(dx / dist(dy, dx));
 		
-		var ax = 
+		dx = totalDist
+		
+		return {
+			x: (totalDist * Math.cos(Math.sin(rotZ) * ((Math.PI / 2) - rotY))) * Math.cos(rotZ),
+			y: (totalDist * Math.cos(Math.sin(rotY) * rotX)) * Math.cos(Math.sin(rotY) * rotX)),
+			z: (totalDist * Math.cos(Math.sin(rotX) * rotY)) * Math.cos(rotX)
+		};
 	}
-	*/
+	
 	BonePositioning.prototype = {
 		getDefaultValue: function(){ return this.def },
 		
 		getPosition: function(valA, valB, percentage, otherPositions){
-			/*
 			var finVal = valA + ((valA - valB) * percentage);
-			
-			var dist = this.shiftX;
-			dist = Math.sqrt((dist * dist) + (this.shiftY * this.shiftY))
-			dist = Math.sqrt((dist * dist) + (this.shiftZ * this.shiftZ))
 			
 			var parentPos = otherPositions[this.parent];
 			if(!parentPos) throw new Error('Could not calc position of bone: must calc position of "' + parentPos + '" first.');
@@ -47,8 +52,8 @@ aPackage('nart.gl.model.positioning.bone', () => {
 				rotZ: parentPos.rotZ
 			};
 			
-			var iSinX = this.shiftX / dist, iSinY = this.shiftY / dist, iSinZ = this.shiftZ / dist;
-			*/
+			
+			
 			throw 'Not implemented'
 			
 		},
