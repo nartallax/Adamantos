@@ -211,13 +211,14 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		}
 		return res;
 	}
-	var min = (a, b) => a < b? a: b,
-		max = (a, b) => a < b? b: a;
-	var mouseMovement = (e, old) => ({
-		x: 'movementX' in e? e.movementX: 'mozMovementX' in e? e.mozMovementX: 'webkitMovementX' in e? e.webkitMovementX: old.x - e.screenX,
-		y: 'movementY' in e? e.movementY: 'mozMovementY' in e? e.mozMovementY: 'webkitMovementX' in e? e.webkitMovementY: old.x - e.screenY
-	})
-	var listenToUserInput = () => {
+	var listenToUserInput = () => {		
+		var min = (a, b) => a < b? a: b,
+			max = (a, b) => a < b? b: a;
+		var mouseMovement = (e, old) => ({
+			x: 'movementX' in e? e.movementX: 'mozMovementX' in e? e.mozMovementX: 'webkitMovementX' in e? e.webkitMovementX: old.x - e.screenX,
+			y: 'movementY' in e? e.movementY: 'mozMovementY' in e? e.mozMovementY: 'webkitMovementX' in e? e.webkitMovementY: old.x - e.screenY
+		})
+		
 		var stopTheEvent = e => (
 			(e.preventDefault && e.preventDefault()), 
 			(e.stopImmediatePropagation && e.stopImmediatePropagation()),
@@ -267,11 +268,10 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		}
 		
 		display.onwheel = e => {
-			var add = (e.wheelDelta > 0? 1: -1) * 0.05
+			var add = (e.wheelDelta > 0? -1: 1) * 0.05
 			var mult = 1 + add;
 			
 			if(e.ctrlKey){
-				
 				var dist = distance(board.cam.x, board.cam.z, board.cam.y - (board.cam.yShift || 0))
 				var shift = dist * add;
 				
@@ -299,6 +299,8 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		board.cam.x = dist * Math.sin(rotX) * Math.cos(rotY);
 		
 		board.cam.y = dist * (-Math.sin(rotY));
+		
+		board.cam.yShift = 0;
 	}
 	var createInitialContainers = () => {
 		var activeTab = null, activeTabBtn = null;
@@ -430,6 +432,7 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			*/
 			
 			board.setAmbientColor([1, 1, 1]);
+			board.addChild(shapeLoader.get('sample'));
 			board.start();
 		
 		}

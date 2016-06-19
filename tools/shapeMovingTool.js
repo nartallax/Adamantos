@@ -86,7 +86,8 @@ require(__dirname + "/../libs/meta/addict.js")
 		};
 			
 		var runFor = (texBase, shapeBase, texDest, shapeDest, onOperationCompleted) => {
-			var texNameToPath = name => splitPath(texBase).concat(name.split('.')).join(path.sep) + '.gif';
+			var fixTexName = name => name.replace("_", ".");
+			var texNameToPath = name => splitPath(texBase).concat(fixTexName(name).split(".")).join(path.sep) + '.gif';
 			
 			var transferModel = (obj, cb) => {
 				total++;
@@ -120,7 +121,7 @@ require(__dirname + "/../libs/meta/addict.js")
 							transferFile(p, texBase, texDest, counter.dec);
 						});
 						
-						ObjReader.getSimplifiedObj(obj, name => name, text => {
+						ObjReader.getSimplifiedObj(obj, fixTexName, text => {
 							createAndGetDestinationPath(obj, shapeBase, shapeDest, dest => {
 								putFile(dest, text, counter.dec);
 							});
