@@ -40,7 +40,7 @@ aPackage('nart.gl.model.positioning.bone', () => {
 			var finVal = valA + ((valA - valB) * percentage);
 			
 			var parentPos = otherPositions[this.parent];
-			if(!parentPos) throw new Error('Could not calc position of bone: must calc position of "' + parentPos + '" first.');
+			if(!parentPos) throw new Error('Could not calc position of bone: must calc position of "' + this.parent + '" first.');
 			
 			var r = {
 				x: parentPos.x,
