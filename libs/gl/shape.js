@@ -49,10 +49,10 @@ aPackage('nart.gl.shape', () => {
 		getRotationZ: function(){ return this.rotZ },
 		
 		// translations
-		move: function(x, y, z){ mat4.translate(this.matrix, [x, y, z]), (this.x += x), (this.y += y), (this.z += z) },
-		moveX: function(x){ mat4.translate(this.matrix, [x, 0, 0]), (this.x += x) },
-		moveY: function(y){ mat4.translate(this.matrix, [0, y, 0]), (this.y += y) },
-		moveZ: function(z){ mat4.translate(this.matrix, [0, 0, z]), (this.z += z) },
+		move: function(x, y, z){ (x || y || z) && (mat4.translate(this.matrix, [x, y, z]), (this.x += x), (this.y += y), (this.z += z)) },
+		moveX: function(x){ x && (mat4.translate(this.matrix, [x, 0, 0]), (this.x += x)) },
+		moveY: function(y){ y && (mat4.translate(this.matrix, [0, y, 0]), (this.y += y)) },
+		moveZ: function(z){ z && (mat4.translate(this.matrix, [0, 0, z]), (this.z += z)) },
 		
 		setPosition: function(x, y, z){ this.move(-this.x, -this.y, -this.z), this.move(this.x = x, this.y = y, this.z = z) },
 		setX: function(x){ this.moveX(-this.x), this.moveX(this.x = x) },

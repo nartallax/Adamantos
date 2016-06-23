@@ -11,10 +11,7 @@ aPackage('nart.net.socket.server', () => {
 		
 		var server = new SocketServer({ port: port });
 		
-		server.on('connection', ws => {
-			var client = clientWrapper(ws);
-			this.connected.fire(client)
-		});
+		server.on('connection', ws => this.connected.fire(clientWrapper(ws)));
 	}
 	
 	return Server;

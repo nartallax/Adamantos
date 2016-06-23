@@ -8,7 +8,7 @@ aPackage('nart.net.socket.client.node', () => {
 		if(!(this instanceof Client)) return new Client(socket)
 		ClientBase.call(this, socket)
 
-		socket.on('message', message => this.messageReceived.fire(JSON.parse(message)));
+		socket.on('message', message => this.messageReceived.fire(message));
 	}
 
 	Client.prototype = clutil.proto(ClientBase, {

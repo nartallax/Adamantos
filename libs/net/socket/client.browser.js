@@ -8,12 +8,13 @@ aPackage('nart.net.socket.client.browser', () => {
 		if(!(this instanceof Client)) return new Client(socket)
 		ClientBase.call(this, socket);
 		
-		this.socket.onmessage = e => this.messageReceived.fire(JSON.parse(e.data))
+		this.socket.onmessage = e => this.messageReceived.fire(new Uint8Array(e.data))
 	}
 	
 	Client.prototype = clutil.proto(ClientBase);
 	Client.connect = (url, cb) => {
 		var socket = new WebSocket(url);
+		socket.binaryType = 'arraybuffer';
 		socket.onopen = () => cb(new Client(socket))
 	}
 	

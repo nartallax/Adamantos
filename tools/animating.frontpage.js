@@ -6,7 +6,11 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		SimpleShape = aRequire('nart.gl.shape.simple'),
 		TextureLoader = aRequire('nart.gl.texture.loader'),
 		ShapeLoader = aRequire('nart.gl.shape.loader'),
-		Board = aRequire('nart.gl.board');
+		Board = aRequire('nart.gl.board'),
+		
+		toolConfig = aRequire('nart.adamantos.tools.config').animatingTool,
+		
+		SocketClient = aRequire('nart.net.socket.client.browser');
 		
 	var tag = (name, attrs) => {
 		attrs = attrs || {};
@@ -373,6 +377,13 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		document.body.appendChild(wrap);
 	}
 		
+	var establishConnection = cb => {
+		SocketClient.connect('ws://' + window.location.hostname + ':' + toolConfig.socketPort, socket => {
+			log('Connection established.');
+			cb && cb(socket);
+		});
+	}
+		
 	return () => {
 		log('Started.');
 		
@@ -385,16 +396,20 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		
 		texLoader = new TextureLoader(board.gl);
 		shapeLoader = new ShapeLoader(board.gl, texLoader);
-		
-		texLoader.downloadAndAddPack('/get_texture_pack', () => {
-			log("Received the texture pack.");
+		var client = null;
+		establishConnection(cl => {
+			window.client = client = cl;
 			
-			shapeLoader.downloadAndAddPack('/get_shape_pack', () => {
-				log("Received the shape pack.");
+			texLoader.downloadAndAddPack('/get_texture_pack', () => {
+				log("Received the texture pack.");
 				
-				afterResourcesLoaded();
+				shapeLoader.downloadAndAddPack('/get_shape_pack', () => {
+					log("Received the shape pack.");
+					
+					afterResourcesLoaded();
+				});
+				
 			});
-			
 		});
 		
 		var afterResourcesLoaded = () => {

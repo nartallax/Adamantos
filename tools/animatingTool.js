@@ -15,8 +15,11 @@ require(__dirname + "/../libs/meta/addict.js")
 			err = aRequire('nart.util.err'),
 			
 			HttpServer = aRequire('nart.net.http.server'),
+			SocketServer = aRequire('nart.net.socket.server'),
+			SocketClient = aRequire('nart.net.socket.client.node'),
 			
-			config = eval('(' + fs.readFileSync(__dirname + '/toolConfig.json', 'utf8') + ')'),
+			config = aRequire('nart.adamantos.tools.config'),
+			//config = eval('(' + fs.readFileSync(__dirname + '/toolConfig.json', 'utf8') + ')'),
 			toolName = ((__filename.match(/[^\\\/]+$/) || [])[0] || '').replace(/\.[^\.]+$/, ''),
 			toolConfig = config[toolName],
 			
@@ -78,6 +81,27 @@ require(__dirname + "/../libs/meta/addict.js")
 			compressedShapePack = pack;
 		})
 
+		new SocketServer(toolConfig.socketPort, s => {
+			var c = SocketClient(s), ip = c.getIp();
+			
+			//c.disconnected.listen(() => log("Disconnected:", ip));
+			c.messageReceived(e => {
+				var data = e.data;
+				console.log(data)
+				for(var i = 0; i < data.length; i++){
+					data[i] = data[i] ^ 0xff;
+				}
+				c.send(data);
+			});
+			
+			log("Connected:", ip)
+			
+			return c
+		});
+		
+		log("Socket server listening on port " + toolConfig.socketPort);
+		
+		
 		var httpServer = new HttpServer(toolConfig.port);
 		httpServer.start(() => {
 			

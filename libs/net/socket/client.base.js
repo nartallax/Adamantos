@@ -15,7 +15,7 @@ aPackage('nart.net.socket.client.base', () => {
 		send: function(data){ 
 			if(this.socket.readyState !== this.socket.OPEN) return false;
 			try {
-				this.socket.send(JSON.stringify(data))
+				this.socket.send(data)
 				return true;
 			} catch (e){
 				this.messageSendFailed.fire({message: data, error: e})

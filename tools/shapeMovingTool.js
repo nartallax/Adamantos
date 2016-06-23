@@ -23,6 +23,7 @@ usage:
 	
 require(__dirname + "/../libs/meta/addict.js")
 	.addRoot('nart', __dirname + '/../libs')
+	.addRoot('nart.adamantos.tools', __dirname)
 	.main(() => {
 		"use strict";
 		
@@ -48,7 +49,8 @@ require(__dirname + "/../libs/meta/addict.js")
 			path = aRequire.node('path'),
 			fs = aRequire.node('fs'),
 			
-			config = eval('(' + fs.readFileSync(__dirname + '/toolConfig.json', 'utf8') + ')');
+			//config = eval('(' + fs.readFileSync(__dirname + '/toolConfig.json', 'utf8') + ')');
+			config = aRequire('nart.adamantos.tools.config');
 			
 		var nameToPath = (name, sourceDir) => splitPath(sourceDir).concat(name.split('.')).join(path.sep) + '.obj';
 			
