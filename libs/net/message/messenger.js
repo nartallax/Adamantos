@@ -6,51 +6,30 @@ expect incoming and outcoming messages to be binary
 */
 aPackage('nart.net.message.messenger', () => {
 	"use strict";
-
-	var Event = aRequire('nart.util.event'),
+	
+	var ClientSideMessenger = aRequire('nart.net.message.messenger.client'),
+		ServerSideMessenger = aRequire('nart.net.message.messenger.server'),
 		ByteManip = aRequire('nart.util.byte.manipulator');
 
-	var Messenger = function(client, isServerSide, unhandledMessagesBufferSize){
+	var Messenger = function(client, isServerSide){
 		if(!(this instanceof Messenger)) return new Messenger(client, isServerSide)
 	
-		this.isServerSide = isServerSide? true: false;
+		(isServerSide? ServerSideMessender: ClientSideMessender).call(this);
+
+		var isServerSide = isServerSide? true: false;
 		this.client = client;
 		this.unhandledMessagesBufferSize = unhandledMessagesBufferSize;
 		
-		this.channels = {};
-		this.unhandledMessageBuffers = {};
-		this.channelNameIdMapping = {};
-		this.channelIdNameMapping = {};
-		this.latencyToClient = null;
-		this.latencyToServer = null;
+		this.onError = new Event();
+		this.onDisconnect = new Event();
 		
 		client.messageReceived.listen(d => {
 			try {
-				
+				this.receive(new ByteManip(d));
 			} catch(e){
 				this.onError.fire({data: d.data, error: e})
 			}
-			/*
-			d = d.data;
-			
-			var error = '';
-			if(!d.channel){
-				error = 'Message contains no channel name'
-			} else if(!this.channels[d.channel]){
-				error = 'Unknown channel name: "' + d.channel + '"';
-			} else {
-				this.channels[d.channel].receive(d)
-			}
-			
-			if(error){
-				d.processingError = error;
-				this.unhandledMessageReceived.fire(d)
-			}
-			*/
-		})
-		
-		this.onError = new Event();
-		this.onDisconnect = new Event();
+		});
 	}
 	
 	var throwMessageDefinitionError = (isServerSide, messageName, channelName, reason) => {
@@ -59,29 +38,72 @@ aPackage('nart.net.message.messenger', () => {
 		);
 	}
 	
+	var throwHandlerDefinitionError = (handlerName, messageName, channelName, reason) => {
+		throw new Error('Failed to define handler "' + handlerName + '" for message "' + messageName + '" on channel "' + channelName + '": ' + reason);
+	}
+	
 	Messenger.prototype = {
-		createIncorrectSideMessageHandler: function(channelName, messageName, handlerName, priority, isServerSideExpected){
+		createIncorrectSideMessageHandler: function(channelName, messageName, priority, isServerSideExpected){
 			return d => {
-				var error = new Error('Could not handle message "' + messageName + '" in channel "' + channelName + '" with handler "' + handlerName + '" and priority ' + priority + ': message received on wrong side (expected: ' + (isServerSide? 'server': 'client') + '-side.');
+				var error = new Error('Could not handle message "' + messageName + '" in channel "' + channelName + '": message received on wrong side (expected: ' + (isServerSide? 'server': 'client') + '-side.');
 				this.onError.fire({data: d, error: error});
 			}
 		},
 		
-		defineMessage: function(channelName, messageName, handler, isServerSide, handlerName, priority){
+		forceAddMessageHandler: function(channelName, messageName, handler, name, priority){
 			priority = priority || 0;
+			name = name || 'default';
+			
+			if(priority > 0xffffffff || priority < 0){
+				throwHandlerDefinitionError(isServerSide, messageName, channelName, 'incorrect priority value: ' + priority);
+			}
+			
+			var channel = this.channels[this.channelNameIdMapping[channelName]],
+				isServerSide = messageName in channel.serverNameIdMapping,
+				messageId = (isServerSide? channel.serverNameIdMapping: channel.clientNameIdMapping)[messageName],
+				handlers = (isServerSide? channel.server: channel.client)[messageId];
+			
+			handlers.forEach(h => {
+				if(h.priority === priority){
+					throwHandlerDefinitionError(isServerSide, messageName, channelName, 'already have handler with priority ' + priority);
+				}
+				
+				if(h.handlerName === handlerName){
+					throwHandlerDefinitionError(isServerSide, messageName, channelName, 'already have handler with name "' + name + '"');
+				}
+			});
+			handlers.push({priority: priority, handler: handler, name: name});
+			handlers.sort((a, b) => a.priority > b.priority? 1: -1);
+		},
+		addMessageHandler: function(channelName, messageName, handler, name, priority){
+			var channel = this.channels[this.channelNameIdMapping[channelName]];
+				
+			if(!channel){
+				throwHandlerDefinitionError(name, messageName, channelName, 'no channel defined.');
+			}
+			
+			var isServerSide = messageName in channel.serverNameIdMapping;
+				
+			if(!(messageName in channel.serverNameIdMapping) && !(messageName in channel.clientNameIdMapping)){
+				throwHandlerDefinitionError(name, messageName, channelName, 'no message defined.');
+			}
+			
+			if(isServerSide !== this.isServerSide){
+				return; // should not define such handler; this message always will generate error on this side
+			}
+			
+			this.forceAddMessageHandler(channelName, messageName, handler, name, priority);
+		},
+		
+		defineMessage: function(channelName, messageName, handler, isServerSide){
 			isServerSide = isServerSide? true: false;
-			handlerName = handlerName || 'default';
 			
 			handler = isServerSide === this.isServerSide? 
 				handler: 
-				this.createIncorrectSideMessageHandler(channelName, messageName, handlerName, priority, isServerSide);
+				this.createIncorrectSideMessageHandler(channelName, messageName, isServerSide);
 			
 			var channel = this.channels[this.channelNameIdMapping[channelName]];
 			if(!channel) throwMessageDefinitionError(isServerSide, messageName, channelName, 'channel not defined');
-			
-			if(priority > 0xffffffff || priority < 0){
-				throwMessageDefinitionError(isServerSide, messageName, channelName, 'incorrect priority value: ' + priority);
-			}
 			
 			var sideObj = isServerSide? channel.server: channel.client,
 				sideMapping = isServerSide? channel.serverNameIdMapping: channel.clientNameIdMapping,
@@ -89,27 +111,16 @@ aPackage('nart.net.message.messenger', () => {
 				messageHandlers;
 				
 			if(messageName in sideMapping){
-				messageHandlers = sideObj[sideMapping[messageName]];
-			} else {
-				var messageId = Object.keys(channel.server).length + Object.keys(channel.client).length + 1;
-				if(messageId > 0xff) throwMessageDefinitionError(isServerSide, messageName, channelName, 'too many messages defined');
-				
-				sideMapping[messageName] = messageId;
-				reverseSideMapping[messageId] = messageName;
-				messageHandlers = sideObj[messageId] = [];
+				throwMessageDefinitionError(isServerSide, messageName, channelName, 'message with this name is already defined.');
 			}
+			var messageId = Object.keys(channel.server).length + Object.keys(channel.client).length + 1;
+			if(messageId > 0xff) throwMessageDefinitionError(isServerSide, messageName, channelName, 'too many messages defined');
 			
-			messageHandlers.forEach(h => {
-				if(h.priority === priority){
-					throwMessageDefinitionError(isServerSide, messageName, channelName, 'handler with priority ' + priority + ' is already defined')
-				}
-				
-				if(h.handlerName === handlerName){
-					throwMessageDefinitionError(isServerSide, messageName, channelName, 'handler named "' + handlerName + '" is already defined')
-				}
-			})
-			messageHandlers.push({priority: priority, handler: handler, name: handlerName});
-			messageHandlers.sort((a, b) => a.priority > b.priority? 1: -1);
+			sideMapping[messageName] = messageId;
+			reverseSideMapping[messageId] = messageName;
+			sideObj[messageId] = [];
+			
+			forceAddMessageHandler(channelName, messageName, handler, handlerName, priority);
 		},
 		defineChannel: function(name, serverSideMessages, clientSideMessages){
 			var id = Object.keys(this.channels).length + 1;
@@ -149,9 +160,7 @@ aPackage('nart.net.message.messenger', () => {
 		},
 		
 		getHandlers: function(channelId, messageId){
-			var channelId = reader.getUint(),
-				messageId = reader.getByte(),
-				channel = this.channels[channelId];
+			var channel = this.channels[channelId];
 			if(!channel) return null;
 			
 			var handlers = (channel.server[messageId] || channel.client[messageId]);
