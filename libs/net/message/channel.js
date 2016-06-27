@@ -1,7 +1,3 @@
-/*
-	message channel. a form of isolation of systems on client and server
-	channel instance defines protocol of communication on message-level
-*/
 aPackage('nart.net.message.channel', () => {
 	"use strict";
 	
