@@ -17,6 +17,7 @@ require(__dirname + "/../libs/meta/addict.js")
 			HttpServer = aRequire('nart.net.http.server'),
 			SocketServer = aRequire('nart.net.socket.server'),
 			SocketClient = aRequire('nart.net.socket.client.node'),
+			Messenger = aRequire('nart.net.message.messenger'),
 			
 			config = aRequire('nart.adamantos.tools.config'),
 			//config = eval('(' + fs.readFileSync(__dirname + '/toolConfig.json', 'utf8') + ')'),
@@ -85,6 +86,7 @@ require(__dirname + "/../libs/meta/addict.js")
 			var c = SocketClient(s), ip = c.getIp();
 			
 			//c.disconnected.listen(() => log("Disconnected:", ip));
+			/*
 			c.messageReceived(e => {
 				var data = e.data;
 				console.log(data)
@@ -93,10 +95,36 @@ require(__dirname + "/../libs/meta/addict.js")
 				}
 				c.send(data);
 			});
+			*/
+			var msgr = new Messenger(c, true);
+			
+			var testChannel = msgr.createChannel({
+				name: 'test.channel',
+				server: {
+					response: bytes => console.log(bytes.getString())
+				},
+				client: {
+					request: bytes => {
+						var str = bytes.getString();
+						str = str + '|' + str;
+						testChannel.server.response.getWriter((writer, cb) => {
+							writer.putString(str);
+							cb();
+						});
+					}
+				}
+			});
+			
+			setInterval(() => {
+				testChannel.client.request.getWriter((writer, cb) => {
+					writer.putString(new Date().getTime() + '');
+					cb();
+				});
+			}, 5000);
 			
 			log("Connected:", ip)
 			
-			return c
+			return msgr;
 		});
 		
 		log("Socket server listening on port " + toolConfig.socketPort);

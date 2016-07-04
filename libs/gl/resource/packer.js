@@ -26,7 +26,6 @@ aPackage('nart.gl.resource.packer', () => {
 		fs = aRequire.node('fs'),
 		splitPath = aRequire('nart.util.fs').splitPath,
 		err = aRequire('nart.util.err'),
-		utf8 = aRequire('nart.util.utf8'),
 		
 		ByteManipulator = aRequire('nart.util.byte.manipulator');
 
@@ -171,7 +170,7 @@ aPackage('nart.gl.resource.packer', () => {
 					result += reader.readUint();
 				});
 				
-				this.getNames().forEach(name => result += 4 + 2 + utf8.byteLength(name)); // место для заголовков
+				this.getNames().forEach(name => result += 4 + ByteManipulator.stringSize(name)); // место для заголовков
 				
 				cb(result);
 			});

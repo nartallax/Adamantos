@@ -21,6 +21,13 @@ aPackage('nart.util.byte.manipulator', () => {
 		return new Manipulator(buffer);
 	};
 	
+	Manipulator.stringSize = str => {
+		var byteLen = utf8.byteLength(str);
+		if(byteLen > 0x7fffffff) throw new Error('String is too long! Max length: 0x7fffffff, got: 0x' + byteLen.toString(16));
+		
+		return (byteLen <= 0x7f? 1: 4) + byteLen;
+	}
+	
 	Manipulator.prototype = {
 		getByte: function(){ return this.b[this.pos++] },
 		getSignedByte: function(){ return decodeSign(this.getByte(), 7) },
@@ -33,9 +40,13 @@ aPackage('nart.util.byte.manipulator', () => {
 			this.pos += len;
 			return res;
 		},
-		getString: function(){ 
-			var len = this.getUshort(),
-				res = utf8.bytesToStr(this.b, this.pos, this.pos + len);
+		getString: function(){
+			var lenFirst = this.getByte(),
+				len = lenFirst & 0x80?
+					(lenFirst << 24) | (this.getByte() << 16) | (this.getByte() << 8) | this.getByte():
+					lenFirst;
+		
+			var res = utf8.bytesToStr(this.b, this.pos, this.pos + len);
 			this.pos += len;
 			return res;
 		},
@@ -49,9 +60,10 @@ aPackage('nart.util.byte.manipulator', () => {
 		putBytes: function(bytes){ bytes.forEach(b => this.putByte(b)) },
 		putString: function(str){
 			var byteLen = utf8.byteLength(str);
-			if(byteLen > 0xffff) throw new Error('String is too long! Max length: 0xffff, got: 0x' + byteLen.toString(16));
+			if(byteLen > 0x7fffffff) throw new Error('String is too long! Max length: 0x7fffffff, got: 0x' + byteLen.toString(16));
 			
-			this.putUshort(byteLen);
+			byteLen <= 0x7f? this.putByte(byteLen): this.putUint(byteLen | 0x80000000);
+			
 			utf8.strToBytes(str, this.b, this.pos);
 			this.pos += byteLen;
 		},

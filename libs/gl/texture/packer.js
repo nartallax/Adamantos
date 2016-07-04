@@ -1,5 +1,5 @@
 // package format: repeated sequences of
-// 		2 byte: byte length of string containing path to texture
+// 		string: name
 //		2 byte: frame count
 //		2 byte: width
 //		2 byte: height

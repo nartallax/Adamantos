@@ -55,33 +55,28 @@ each channel could not have more than 0xff message types (in total of client- an
 so, all the handlers of the messages on channel should be defined before receiving channel definition from server
 it is done this way to explicitly prevent any partial data loss: all the messages are received or all are not received, no other options left
 
-conclusion:
-root package types are:
-	1. define channel
-	2. undefine channel
-	3. ping
-	4. pong
-	5. timeshift
-
 */
 aPackage('nart.net.message.messenger', () => {
 	"use strict";
 	
-	var ClientSideMessenger = aRequire('nart.net.message.messenger.client'),
-		ServerSideMessenger = aRequire('nart.net.message.messenger.server'),
-		ByteManip = aRequire('nart.util.byte.manipulator'),
-		Throw = aRequire('nart.util.throw');
+	var ByteManip = aRequire('nart.util.byte.manipulator'),
+		Throw = aRequire('nart.util.throw'),
+		Event = aRequire('nart.util.event');
 
 	var Messenger = function(client, isServerSide){
 		if(!(this instanceof Messenger)) return new Messenger(client, isServerSide)
 	
-		(isServerSide? ServerSideMessender: ClientSideMessender).call(this);
-
 		this.client = client;
+		this.isServerSide = isServerSide;
+		
+		this.channels = {};
+		this.channelIdNameMap = {};
+		this.channelId = 1;
 		
 		this.onError = new Event(); // any error happened during request processing
 		this.onDisconnect = new Event(); // connection closed by some reason
 		this.onChannelDefined = new Event(); // server defines a new channel
+		this.onChannelUndefined = new Event();
 		
 		client.messageReceived.listen(d => {
 			try {
@@ -90,6 +85,156 @@ aPackage('nart.net.message.messenger', () => {
 				this.onError.fire({data: d.data, error: e})
 			}
 		});
+		
+		this.onChannelDefined(e => {
+			var channel = e.data.channel,
+				serverMap = e.data.serverMap,
+				clientMap = e.data.clientMap;
+				
+			this.channelIdNameMap[channel.id] = channel.name;
+				
+			if(this.isServerSide){
+				this.sendChannelDefinitionPackage(channel.name, channel.id, serverMap, clientMap);
+			} /* else we just don't process the event; we already have received all required data */
+		});
+		
+		this.onChannelUndefined(e => {
+			var channel = e.data.channel,
+				id = e.data.id;
+			
+			delete this.channelIdNameMap[id];
+			
+			if(this.isServerSide){
+				this.sendChanneldUndefinitionPackage(id);
+			}
+		});
+	}
+	
+	var readDefinitionData = data => {
+		var readSide = () => {
+			var len = data.getByte(), side = {};
+			
+			while(len-->0){
+				var name = data.getString(), id = data.getByte();
+				side[name] = id;
+			}
+			
+			return side;
+		}
+		
+		return {
+			id: getUint(),
+			name: getString(),
+			server: readSide(),
+			client: readSide()
+		}
+	}
+	
+	Messenger.prototype = {
+		// def: {name: "name", server: {msgA:() => {...}, ...}, client: {msgB: () => {...}, ...}}
+		createChannel: function(channelDef, handlerName, handlerPriority, noAutodef){
+			var channel = new Messenger.Channel(channelDef.name, this);
+
+			var defineSide = (def, isServer) => {
+				Object.keys(def).forEach(name => {
+					var msg = new Messenger.Message(name, channel, isServer);
+					channel.addMessage(msg);
+					
+					if(isServer !== this.isServerSide){
+						var handler = def[name];
+						msg.addHandler(handler, handlerName, handlerPriority);
+					}
+				})
+			}
+			
+			defineSide(channelDef.server, true);
+			defineSide(channelDef.client, false);
+			
+			(!noAutodef) && this.isServerSide && setTimeout(() => channel.define(), 1);
+			
+			return this.channels[channel.name] = channel;
+		},
+		
+		generateChannelId: function(){
+			return this.channelId++;
+		},
+		
+		getDataWriter: function(channelId, messageId, payloadSize){
+			var writer = ByteManip.alloc(payloadSize + 6);
+			writer.putByte(Messenger.Message.BasicTypes.data);
+			writer.putUint(channelId);
+			writer.putByte(messageId);
+			return writer;
+		},
+		
+		// better not use it directly
+		sendArbitraryBinaryData: function(data){ this.client.send(data) },
+		
+		sendChannelDefinitionPackage: function(name, id, serverMap, clientMap){
+			var byteSize = 1 + 4 + ByteManip.stringSize(name)
+				+ 1 + Object.keys(serverMap).map(name => 1 + ByteManip.stringSize(name)).reduce((a, b) => a + b, 0)
+				+ 1 + Object.keys(clientMap).map(name => 1 + ByteManip.stringSize(name)).reduce((a, b) => a + b, 0);
+				
+			var bytes = ByteManip.alloc(byteSize),
+				msgCount = Object.keys(clientMap) + Object.keys(serverMap);
+			
+			if(msgCount > 0xfe){
+				Throw.formatted('Could not generate definition for channel "$1": too many messages defined (max: $2, have: $3)', 'TOO_MANY_MESSAGES')
+					(this.name, 0xfe, msgCount);
+			}
+			
+			bytes.putByte(Messenger.Message.BasicTypes.defineChannel);
+			bytes.putUint(id);
+			bytes.putString(name);
+			
+			bytes.putByte(Object.keys(serverMap).length);
+			Object.keys(serverMap).forEach(name => (bytes.putByte(serverMap[name]), bytes.putString(name)));
+			bytes.putByte(Object.keys(clientMap).length);
+			Object.keys(clientMap).forEach(name => (bytes.putByte(clientMap[name]), bytes.putString(name)));
+			
+			this.sendArbitraryBinaryData(bytes.getBuffer());
+		},
+		
+		sendChannelUndefinitionPackage: function(id){
+			var bytes = ByteManip.alloc(1 + 4);
+			
+			bytes.putByte(Messenger.Message.BasicTypes.undefineChannel);
+			bytes.putUint(id);
+			
+			this.sendArbitraryBinaryData(bytes.getBuffer());
+		},
+		
+		getChannelOrThrow: function(id){
+			var channel = this.channels[this.channelIdNameMap[channelId]];
+				
+			if(!channel){
+				Throw.formatted('Failed to handle message: have no channel with ID $1.', 'ABSENT_DEFINITION')(channelId);
+			}
+		},
+		
+		readGetChannelOrThrow: function(data){ return this.getChannelOrThrow(data.getUint()) },
+		
+		receive: function(data){
+			var basicType = data.getByte();
+			
+			switch(basicType) {
+				case Messenger.Message.BasicTypes.data:
+					return this.readGetChannelOrThrow(data).handle(data);
+				case Messenger.Message.BasicTypes.undefineChannel:
+					if(this.isServerSide) failBasicOnWrongSide('undefine_channel');
+					console.log('Got undefine');
+					return this.readGetChannelOrThrow(data).undefine();
+				case Messenger.Message.BasicTypes.defineChannel:
+					if(this.isServerSide) failBasicOnWrongSide('define_channel');
+					console.log('Got define');
+					var def = readDefinitionData(data);
+					console.log(def);
+					return this.channels[def.name](def.id, def.server, def.client);
+				default:
+					Throw.formatted('Failed to process the message: unknown type code $1.', 'UNKNOWN_BASIC_MESSAGE_TYPE')(basicType);
+					
+			}
+		}
 	}
 	
 	Messenger.Channel = function(name, messenger){ 
@@ -99,14 +244,147 @@ aPackage('nart.net.message.messenger', () => {
 		this.server = {}; 
 		this.client = {};
 		
-		if(name.length < 2) Throw.formatted('Failed to create channel definition: name "$1" is too short.', name);
+		this.serverIdNameMapping = {};
+		this.clientIdNameMapping = {};
+		
+		if(name.length < 2) Throw.formatted('Failed to create channel definition: name "$1" is too short.', 'NAME_TOO_SHORT')(name);
 	};
 	Messenger.Channel.prototype = {
-		isServerDefined: function(){ return this.id? true: false }
+		isServerDefined: function(){ return this.id? true: false },
+		
+		handle: function(message){
+			var msgId = message.getByte();
+			var isServerSide = msgId in this.serverIdNameMapping;
+			var name = (isServerSide? this.serverIdNameMapping: this.clientIdNameMapping)[msgId];
+			
+			if(!name){
+				Throw.formatted('Failed to handle message with ID = $1 on channel "$2": no message found for this ID.', 'UNKNOWN_ID')(msgId, this.channelName);
+			}
+			
+			(isServerSide? this.server: this.client)[name].handle(message);
+		},
+		
+		define: function(){
+			if(!this.messenger.isServerSide){
+				Throw.formatted('Could not define channel "$1" on client-side: channels are defined and undefined on server-side.', 'DEFINITION_ON_WRONG_SIDE')(this.name);
+			}
+			
+			var ids = this.generateIds();
+			
+			this.setDefinition(ids.id, ids.server, ids.client);
+		},
+		
+		undefine: function(){
+			if(!this.messenger.isServerSide){
+				Throw.formatted('Could not undefine channel "$1" on client-side: channels are defined and undefined on server-side.', 'UNDEFINITION_ON_WRONG_SIDE')(this.name);
+			}
+			
+			this.forceUnsetDefinition();
+		},
+	
+		forceUnsetDefinition: function(){
+			if(!this.isServerDefined()){
+				Throw.formatted('Failed to undefine channel "$1": it is not defined.', 'DUPLICATE_UNDEFINITION')(this.name);
+			}
+			
+			var oldId = this.id;
+			
+			this.id = null;
+			Object.keys(this.server).forEach(name => this.server[name].id = null);
+			Object.keys(this.client).forEach(name => this.client[name].id = null);
+			
+			this.messenger.onChannelUndefined.fire({channel: this, id: oldId});
+		},
+		
+		setDefinition: function(id, serverMap, clientMap){
+			if(this.isServerDefined()){
+				Throw.formatted('Failed to set definition of channel "$1": the channel is already defined.', 'DUPLICATE_DEFINITION')(this.name);
+			}
+			
+			var consumeForSide = (side, mapping, sideName) => {
+				Object.keys(mapping).forEach(name => {
+					var id = mapping[name];
+					
+					if(!(name in side)){
+						Throw.formatted('Failed to set definition for $1-side message "$2" on channel "$3": there is no message with this name on this side.', 'UNKNOWN_NAME')
+							(sideName, name, this.name);
+					}
+					
+					side[name].id = id;
+				});
+			}
+			
+			this.id = id;
+			
+			consumeForSide(this.server, serverMap, 'server');
+			consumeForSide(this.client, clientMap, 'client');
+			
+			this.messenger.onChannelDefined.fire({channel: this, id: id, serverMap: serverMap, clientMap: clientMap});
+		},
+		
+		generateIds: function(){
+			if(!this.messenger.isServerSide){
+				Throw.formatted('Could not generate IDs for channel "$1": IDs should be generated server-side only.', 'ID_GENERATOR_ON_WRONG_SIDE')(this.name);
+			}
+			
+			if(this.isServerDefined()){
+				Throw.formatted('Could not generate IDs for channel "$1": defined channel could not be modified.', 'DEFINED_MODIFICATION')(this.name);
+			}
+			
+			var serverKeys = Object.keys(this.server),
+				clientKeys = Object.keys(this.client),
+				msgId = 1;
+				
+			if(serverKeys.length + clientKeys.length > 0xfe){
+				Throw.formatted('Could not generate definition for channel "$1": too many messages defined (max: $2, have: $3)', 'TOO_MANY_MESSAGES')
+					(this.name, 0xfe, serverKeys.length + clientKeys.length);
+			}
+			
+			var generateFor = keys => {
+				var result = {};
+				keys.forEach(name => result[name] = msgId++);
+				return result;
+			}
+			
+			return {
+				id: this.messenger.generateChannelId(),
+				client: generateFor(clientKeys),
+				server: generateFor(serverKeys)
+			}
+		},
+		
+		addMessage: function(message){
+			if(this.isServerDefined()){
+				Throw.formatted('Could not add message to channel "$1": defined channel could not be modified.', 'DEFINED_MODIFICATION')(this.name);
+			}
+			
+			var side = message.isServerSide? this.server: this.client;
+			
+			if(message.name in side){
+				Throw.formatted('Could not add message to channel "$1": duplicate message name "$2".', 'DUPLICATE_DEFINITION')(this.name, message.name);
+			}
+			
+			side[message.name] = message;
+		},
+		
+		removeMessage: function(message){
+			if(this.isServerDefined()){
+				Throw.formatted('Could not remove message from channel "$1": defined channel could not be modified.', 'DEFINED_MODIFICATION')(this.name);
+			}
+			
+			var side = message.isServerSide? this.server: this.client;
+			
+			if(!(message.name in side)){
+				Throw.formatted('Could not remove message from channel "$1": no message named "$2".', 'ABSENT_DEFINITION')(this.name, message.name);
+			}
+			
+			delete side[message.name];
+		}
 	};
 	
-	var failToCreateMessageWriter = Throw.formatted('Failed to create writer for message "$1" in channel "$2": $3.'),
-		failToAddHandler = Throw.formatted('Failed to add handler "$1" with priority $2 to message "$3" on channel "$4": $5.');
+	var failToCreateMessageWriter = Throw.formatted('Failed to create writer for message "$1" in channel "$2": $3.', 'WRITER_CREATE_FAILED'),
+		failToAddHandler = Throw.formatted('Failed to add handler "$1" with priority $2 to message "$3" on channel "$4": $5.', 'HANDLER_CREATE_FAILED'),
+		failBasicOnWrongSide = Throw.formatted('Failed to receive message "$1": this messages must not be handled on this side.', 'BASIC_MESSAGE_ON_WRONG_SIDE');
 	
 	Messenger.Message = function(name, channel, isServerSide){ 
 		this.name = name;
@@ -115,11 +393,11 @@ aPackage('nart.net.message.messenger', () => {
 		this.channel = channel;
 		this.handlers = [];
 		
-		if(name.length < 2) Throw.formatted('Failed to create message definition on channel "$2": name "$1" is too short.', name, channel.name);
+		if(name.length < 2) Throw.formatted('Failed to create message definition on channel "$2": name "$1" is too short.', 'NAME_TOO_SHORT')(name, channel.name);
 		
 		if(this.isOnSenderSide()){
 			this.forceAddHandler(() => {
-				Throw.formatted('Failed to handle incoming message "$1" on channel "$2": message received on wrong side.')(name, channel.name);
+				Throw.formatted('Failed to handle incoming message "$1" on channel "$2": message received on wrong side.', 'RECEIVED_ON_WRONG_SIDE')(name, channel.name);
 			}, 'wrong-message-side-error-throwing-handler', 0xffffffff)
 		}
 	}
@@ -135,26 +413,31 @@ aPackage('nart.net.message.messenger', () => {
 			if(!id) failToCreateMessageWriter(this.name, this.channelName, 'no message id defined');
 			if(!this.isOnSenderSide()) failToCreateMessageWriter(this.name, this.channelName, 'tried to send message from wrong side');
 			
-			size += 6;
-			var writer = ByteManip.alloc(size);
-			writer.putByte(Messenger.Message.BasicTypes.data);
-			writer.putUint(cid);
-			writer.putByte(id);
+			var writer = this.channel.messenger.getDataWriter(id, cid, size);
+			
+			var initialPos = writer.getPosition();
 			
 			callback(writer, () => {
-				var data = writer.getBuffer();
+				var data = writer.getBuffer(),
+					writtenBytes = writer.getPosition() - initialPos;
 			
-				if(data.length !== writer.getPosition()){
-					Throw.formatted('Failed to send written message "$1" on channel "$2": expected buffer size not matches actual ($3 vs $4).')
-						(this.name, this.channelName, size, data.length);
+				if(writtenBytes !== size){
+					Throw.formatted('Failed to send written message "$1" on channel "$2": expected buffer size not matches actual ($3 !== $4).', 'BUFFER_SIZE_MESSED_UP')
+						(this.name, this.channelName, size, writtenBytes);
 				}
 				
 				this.channel.messenger.sendArbitraryBinaryData(data);
 			});
 		},
 		
+		removeHandler: function(name){
+			var oldLen = this.handlers.length;
+			this.handlers = this.handlers.filter(h => h.name === name);
+			if(oldLen === this.handlers.len) Throw.formatted('Failed to remove handler "$1" from message "$2" on channel "$3": no handler found.', 'HANDLER_REMOVE_FAILED')
+					(name, this.name, this.channel.name);
+		},
 		
-		addHandler: function(hanlder, name, priority){
+		addHandler: function(handler, name, priority){
 			if(this.isOnSenderSide()){
 				failToAddHandler(name, priority, this.name, this.channel.name, 'could not handle incoming messages while on sender side')
 			}
@@ -183,12 +466,12 @@ aPackage('nart.net.message.messenger', () => {
 		handle: function(message){
 			for(var i = 0; i < this.handlers.length; i++){
 				var isUnhandled = this.handlers[i](message);
-				if(!isUnhandled) return;
+				if(isUnhandled !== false) return;
 			}
 			
-			Throw.formatted('Failed to handle message "$1" on channel "$2": all the handlers failed to handle the message.', this.name, this.channel.name);
+			Throw.formatted('Failed to handle message "$1" on channel "$2": all the handlers failed to handle the message.', 'ALL_HANDLERS_REFUSED')(this.name, this.channel.name);
 		}
-	}
+	} 
 	
 	Messenger.Message.BasicTypes = {
 		data: 0x00,
@@ -200,17 +483,6 @@ aPackage('nart.net.message.messenger', () => {
 		
 		defineChannel: 0x04,
 		undefineChannel: 0x05
-	}
-	
-	Messenger.prototype = {
-		defineChannel: (channelDefinitionObject, hanldersName, handlersPriority) => { /* ...? */ },
-		
-		getChannels: () => {
-			/* channels: {channel_name: channel} */
-		},
-		
-		// better not use it directly
-		sendArbitraryBinaryData: data => this.client.send(data)
 	}
 	
 	return Messenger;

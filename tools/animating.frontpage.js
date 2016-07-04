@@ -6,11 +6,13 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		SimpleShape = aRequire('nart.gl.shape.simple'),
 		TextureLoader = aRequire('nart.gl.texture.loader'),
 		ShapeLoader = aRequire('nart.gl.shape.loader'),
+		
 		Board = aRequire('nart.gl.board'),
 		
 		toolConfig = aRequire('nart.adamantos.tools.config').animatingTool,
 		
-		SocketClient = aRequire('nart.net.socket.client.browser');
+		SocketClient = aRequire('nart.net.socket.client.browser'),
+		Messenger = aRequire('nart.net.message.messenger');
 		
 	var tag = (name, attrs) => {
 		attrs = attrs || {};
@@ -380,6 +382,28 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 	var establishConnection = cb => {
 		SocketClient.connect('ws://' + window.location.hostname + ':' + toolConfig.socketPort, socket => {
 			log('Connection established.');
+			
+			var msgr = new Messenger(socket, false);
+			
+			var testChannel = msgr.createChannel({
+				name: 'test.channel',
+				server: {
+					response: bytes => console.log(bytes.getString())
+				},
+				client: {
+					request: bytes => {
+						var str = bytes.getString();
+						str = str + '|' + str;
+						testChannel.server.response.getWriter((writer, cb) => {
+							writer.putString(str);
+							cb();
+						});
+					}
+				}
+			});
+			
+			msgr.onError(e => log('Messenger error: ' + err.data.message));
+			
 			cb && cb(socket);
 		});
 	}
@@ -396,9 +420,9 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		
 		texLoader = new TextureLoader(board.gl);
 		shapeLoader = new ShapeLoader(board.gl, texLoader);
-		var client = null;
-		establishConnection(cl => {
-			window.client = client = cl;
+		var msgr = null;
+		establishConnection(msgr => {
+			window.msgr = msgr = msgr;
 			
 			texLoader.downloadAndAddPack('/get_texture_pack', () => {
 				log("Received the texture pack.");
