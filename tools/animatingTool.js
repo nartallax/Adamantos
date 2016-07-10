@@ -117,8 +117,13 @@ require(__dirname + "/../libs/meta/addict.js")
 			});
 			
 			msgr.onStatsUpdate(e => console.log(e.data))
+			msgr.onDisconnect(e => {
+				console.log('Disconnected.')
+				clearInterval(dataSendInterval);
+			})
+			msgr.onError(e => (console.log('Messenger error: '), console.log(e.data)))
 			
-			setInterval(() => {
+			var dataSendInterval = setInterval(() => {
 				var str = new Date().getTime() + '';
 				testChannel.server.request.writeAndSend(ByteManip.stringSize(str), (writer, cb) => {
 					writer.putString(str);

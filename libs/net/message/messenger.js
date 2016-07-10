@@ -67,13 +67,15 @@ aPackage('nart.net.message.messenger', () => {
 	var ByteManip = aRequire('nart.util.byte.manipulator'),
 		Throw = aRequire('nart.util.throw'),
 		Event = aRequire('nart.util.event'),
-		LimitedQueue = aRequire('nart.util.queue.limited');
+		LimitedQueue = aRequire('nart.util.queue.limited'),
+		Channel = aRequire('nart.net.message.channel'),
+		Message = aRequire('nart.net.message.message');
 
 	var getHeartbeatConfig = base => {
 		base = base || {};
 		
-		base.interval || (base.interval = 5000);
-		base.timeout || (base.timeout = base.interval * 3);
+		base.interval || (base.interval = 1000);
+		base.timeout || (base.timeout = base.interval * 10);
 		base.poolSize || (base.poolSize = 10);
 		base.lowerFilter || (base.lowerFilter = 0.5);
 		base.higherFilter || (base.higherFilter = 1.5);
@@ -90,18 +92,22 @@ aPackage('nart.net.message.messenger', () => {
 			toServer: 0
 		};
 
+		
 		this.client = client;
 		this.isServerSide = isServerSide;
+		this.isConnected = true;
 		
 		this.channels = {};
 		this.channelIdNameMap = {};
 		this.channelId = 1;
 		
-		this.onError = new Event(); // any error happened during request processing
+		// any error that is not related with BAD usage of messenger: network errors etc
+		// something that should not be thrown directly and something you may want to log instead of handling it with catch
+		this.onError = new Event(); 
 		this.onDisconnect = new Event(); // connection closed by some reason
 		this.onChannelDefined = new Event(); // server defines a new channel
-		this.onChannelUndefined = new Event();
-		this.onStatsUpdate = new Event();
+		this.onChannelUndefined = new Event(); // guess what
+		this.onStatsUpdate = new Event(); // channel stats (i.e. ping values) are updated
 		
 		client.messageReceived.listen(d => {
 			try {
@@ -170,11 +176,11 @@ aPackage('nart.net.message.messenger', () => {
 	Messenger.prototype = {
 		// def: {name: "name", server: {msgA:() => {...}, ...}, client: {msgB: () => {...}, ...}}
 		createChannel: function(channelDef, handlerName, handlerPriority, noAutodef){
-			var channel = new Messenger.Channel(channelDef.name, this);
+			var channel = new Channel(channelDef.name, this);
 
 			var defineSide = (def, isServer) => {
 				Object.keys(def).forEach(name => {
-					var msg = new Messenger.Message(name, channel, isServer);
+					var msg = new Message(name, channel, isServer);
 					channel.addMessage(msg);
 					
 					if(isServer !== this.isServerSide){
@@ -198,7 +204,7 @@ aPackage('nart.net.message.messenger', () => {
 		
 		getDataWriter: function(channelId, messageId, payloadSize){
 			var writer = ByteManip.alloc(payloadSize + 6);
-			writer.putByte(Messenger.Message.BasicTypes.data);
+			writer.putByte(basicMessageTypes.data);
 			writer.putUint(channelId);
 			writer.putByte(messageId);
 			return writer;
@@ -220,7 +226,7 @@ aPackage('nart.net.message.messenger', () => {
 					(this.name, 0xfe, msgCount);
 			}
 			
-			bytes.putByte(Messenger.Message.BasicTypes.defineChannel);
+			bytes.putByte(basicMessageTypes.defineChannel);
 			bytes.putUint(id);
 			bytes.putString(name);
 			
@@ -235,7 +241,7 @@ aPackage('nart.net.message.messenger', () => {
 		csendChannelUndefinitionPackage: function(id){
 			var bytes = ByteManip.alloc(1 + 4);
 			
-			bytes.putByte(Messenger.Message.BasicTypes.undefineChannel);
+			bytes.putByte(basicMessageTypes.undefineChannel);
 			bytes.putUint(id);
 			
 			this.sendArbitraryBinaryData(bytes.getBuffer());
@@ -243,7 +249,7 @@ aPackage('nart.net.message.messenger', () => {
 		
 		deferHeartbeatDisconnect: function(){
 			this.heartbeatDisconnectHandle && clearTimeout(this.heartbeatDisconnectHandle);
-			this.heartbeatDisconnectHandle = setTimeout(() => this.disconnect(), this.heartbeatConfig.timeout);
+			this.heartbeatDisconnectHandle = setTimeout(() => ((this.heartbeatDisconnectHandle = null), this.disconnect()), this.heartbeatConfig.timeout);
 		},
 		
 		setupHeartbeat: function(config){
@@ -259,16 +265,15 @@ aPackage('nart.net.message.messenger', () => {
 			
 			if(this.isServerSide){
 				this.sendHeartbeatSetupPackage(this.heartbeatConfig);
-				setTimeout(() => {
-					this.heartbeatSendHandle = setInterval(() => this.sendPingPackage(), this.heartbeatConfig.interval);
-				}, this.heartbeatConfig.timeout / 10)
+				this.heartbeatSendHandle = setInterval(() => this.sendPingPackage(), this.heartbeatConfig.interval);
+				setImmediate(() => this.sendPingPackage());
 			}
 		},
 		
 		sendHeartbeatSetupPackage: function(conf){
 			var bytes = ByteManip.alloc(1 + (4 * 6));
 			
-			bytes.putByte(Messenger.Message.BasicTypes.heartbeatConfig);
+			bytes.putByte(basicMessageTypes.heartbeatConfig);
 			
 			bytes.putUint(conf.interval);
 			bytes.putUint(conf.timeout);
@@ -283,7 +288,7 @@ aPackage('nart.net.message.messenger', () => {
 		sendPingPackage: function(){
 			var bytes = ByteManip.alloc(1 + 8 + 4 + 4 + 4 + 4);
 				
-			bytes.putByte(Messenger.Message.BasicTypes.ping);
+			bytes.putByte(basicMessageTypes.ping);
 			bytes.putUlong(new Date().getTime());
 			bytes.putUint(this.ping.toClient);
 			bytes.putUint(this.ping.toServer);
@@ -300,7 +305,7 @@ aPackage('nart.net.message.messenger', () => {
 		sendPongPackage: function(serverTime){
 			var bytes = ByteManip.alloc(1 + 8 + 8);
 			
-			bytes.putByte(Messenger.Message.BasicTypes.pong);
+			bytes.putByte(basicMessageTypes.pong);
 			bytes.putUlong(serverTime);
 			bytes.putUlong(new Date().getTime());
 			
@@ -336,30 +341,35 @@ aPackage('nart.net.message.messenger', () => {
 		readGetChannelOrThrow: function(data){ return this.getChannelOrThrow(data.getUint()) },
 		
 		disconnect: function(){
-			console.log('DISCONNECT!!!!111');
-			//...
+			this.isConnected = false;
+			this.client.disconnect();
+			
+			this.heartbeatDisconnectHandle && clearTimeout(this.heartbeatDisconnectHandle);
+			this.heartbeatSendHandle && clearInterval(this.heartbeatSendHandle);
+			
+			this.onDisconnect.fire();
 		},
 		
 		receive: function(data){
 			var basicType = data.getByte();
 			
 			switch(basicType) {
-				case Messenger.Message.BasicTypes.data:
+				case basicMessageTypes.data:
 					return this.readGetChannelOrThrow(data).handle(data);
-				case Messenger.Message.BasicTypes.ping:
+				case basicMessageTypes.ping:
 					if(this.isServerSide) failBasicOnWrongSide('ping');
 					return this.processPing(data);
-				case Messenger.Message.BasicTypes.pong:
+				case basicMessageTypes.pong:
 					if(!this.isServerSide) failBasicOnWrongSide('pong');
 					return this.processPong(data);
-				case Messenger.Message.BasicTypes.defineChannel:
+				case basicMessageTypes.defineChannel:
 					if(this.isServerSide) failBasicOnWrongSide('define_channel');
 					var def = readDefinitionData(data);
 					return this.channels[def.name].setDefinition(def.id, def.server, def.client);
-				case Messenger.Message.BasicTypes.heartbeatConfig:
+				case basicMessageTypes.heartbeatConfig:
 					if(this.isServerSide) failBasicOnWrongSide('heartbeat_config');
 					return this.setupHeartbeat(readHeartbeatConfig(data))
-				case Messenger.Message.BasicTypes.undefineChannel:
+				case basicMessageTypes.undefineChannel:
 					if(this.isServerSide) failBasicOnWrongSide('undefine_channel');
 					return this.readGetChannelOrThrow(data).undefine();
 				default:
@@ -369,244 +379,7 @@ aPackage('nart.net.message.messenger', () => {
 		}
 	}
 	
-	Messenger.Channel = function(name, messenger){ 
-		this.messenger = messenger; 
-		this.name = name; 
-		this.id = null; 
-		this.server = {}; 
-		this.client = {};
-		
-		this.serverIdNameMapping = {};
-		this.clientIdNameMapping = {};
-		
-		if(name.length < 2) Throw.formatted('Failed to create channel definition: name "$1" is too short.', 'NAME_TOO_SHORT')(name);
-	};
-	Messenger.Channel.prototype = {
-		isServerDefined: function(){ return this.id? true: false },
-		
-		handle: function(message){
-			var msgId = message.getByte();
-			var isServerSide = msgId in this.serverIdNameMapping;
-			var name = (isServerSide? this.serverIdNameMapping: this.clientIdNameMapping)[msgId];
-			
-			if(!name){
-				Throw.formatted('Failed to handle message with ID = $1 on channel "$2": no message found for this ID.', 'UNKNOWN_ID')(msgId, this.name);
-			}
-			
-			(isServerSide? this.server: this.client)[name].handle(message);
-		},
-		
-		define: function(){
-			if(!this.messenger.isServerSide){
-				Throw.formatted('Could not define channel "$1" on client-side: channels are defined and undefined on server-side.', 'DEFINITION_ON_WRONG_SIDE')(this.name);
-			}
-			
-			var ids = this.generateIds();
-			
-			this.setDefinition(ids.id, ids.server, ids.client);
-		},
-		
-		undefine: function(){
-			if(!this.messenger.isServerSide){
-				Throw.formatted('Could not undefine channel "$1" on client-side: channels are defined and undefined on server-side.', 'UNDEFINITION_ON_WRONG_SIDE')(this.name);
-			}
-			
-			this.forceUnsetDefinition();
-		},
-	
-		forceUnsetDefinition: function(){
-			if(!this.isServerDefined()){
-				Throw.formatted('Failed to undefine channel "$1": it is not defined.', 'DUPLICATE_UNDEFINITION')(this.name);
-			}
-			
-			var oldId = this.id;
-			
-			this.id = null;
-			Object.keys(this.server).forEach(name => this.server[name].id = null);
-			Object.keys(this.client).forEach(name => this.client[name].id = null);
-			
-			this.messenger.onChannelUndefined.fire({channel: this, id: oldId});
-		},
-		
-		setDefinition: function(id, serverMap, clientMap){
-			if(this.isServerDefined()){
-				Throw.formatted('Failed to set definition of channel "$1": the channel is already defined.', 'DUPLICATE_DEFINITION')(this.name);
-			}
-			
-			var consumeForSide = (side, idNameMapping, sourceMapping, sideName) => {
-				Object.keys(sourceMapping).forEach(name => {
-					var id = sourceMapping[name];
-					idNameMapping[id] = name;
-					
-					if(!(name in side)){
-						Throw.formatted('Failed to set definition for $1-side message "$2" on channel "$3": there is no message with this name on this side.', 'UNKNOWN_NAME')
-							(sideName, name, this.name);
-					}
-					
-					side[name].id = id;
-				});
-			}
-			
-			this.id = id;
-			
-			consumeForSide(this.server, this.serverIdNameMapping = {}, serverMap, 'server');
-			consumeForSide(this.client, this.clientIdNameMapping = {}, clientMap, 'client');
-			
-			this.messenger.onChannelDefined.fire({channel: this, id: id, serverMap: serverMap, clientMap: clientMap});
-		},
-		
-		generateIds: function(){
-			if(!this.messenger.isServerSide){
-				Throw.formatted('Could not generate IDs for channel "$1": IDs should be generated server-side only.', 'ID_GENERATOR_ON_WRONG_SIDE')(this.name);
-			}
-			
-			if(this.isServerDefined()){
-				Throw.formatted('Could not generate IDs for channel "$1": defined channel could not be modified.', 'DEFINED_MODIFICATION')(this.name);
-			}
-			
-			var serverKeys = Object.keys(this.server),
-				clientKeys = Object.keys(this.client),
-				msgId = 1;
-				
-			if(serverKeys.length + clientKeys.length > 0xfe){
-				Throw.formatted('Could not generate definition for channel "$1": too many messages defined (max: $2, have: $3)', 'TOO_MANY_MESSAGES')
-					(this.name, 0xfe, serverKeys.length + clientKeys.length);
-			}
-			
-			var generateFor = keys => {
-				var result = {};
-				keys.forEach(name => result[name] = msgId++);
-				return result;
-			}
-			
-			return {
-				id: this.messenger.generateChannelId(),
-				server: generateFor(serverKeys),
-				client: generateFor(clientKeys)
-			}
-		},
-		
-		addMessage: function(message){
-			if(this.isServerDefined()){
-				Throw.formatted('Could not add message to channel "$1": defined channel could not be modified.', 'DEFINED_MODIFICATION')(this.name);
-			}
-			
-			var side = message.isServerSide? this.server: this.client;
-			
-			if(message.name in side){
-				Throw.formatted('Could not add message to channel "$1": duplicate message name "$2".', 'DUPLICATE_DEFINITION')(this.name, message.name);
-			}
-			
-			side[message.name] = message;
-		},
-		
-		removeMessage: function(message){
-			if(this.isServerDefined()){
-				Throw.formatted('Could not remove message from channel "$1": defined channel could not be modified.', 'DEFINED_MODIFICATION')(this.name);
-			}
-			
-			var side = message.isServerSide? this.server: this.client;
-			
-			if(!(message.name in side)){
-				Throw.formatted('Could not remove message from channel "$1": no message named "$2".', 'ABSENT_DEFINITION')(this.name, message.name);
-			}
-			
-			delete side[message.name];
-		}
-	};
-	
-	var failToCreateMessageWriter = Throw.formatted('Failed to create writer for message "$1" in channel "$2": $3.', 'WRITER_CREATE_FAILED'),
-		failToAddHandler = Throw.formatted('Failed to add handler "$1" with priority $2 to message "$3" on channel "$4": $5.', 'HANDLER_CREATE_FAILED'),
-		failBasicOnWrongSide = Throw.formatted('Failed to receive message "$1": this messages must not be handled on this side.', 'BASIC_MESSAGE_ON_WRONG_SIDE');
-	
-	Messenger.Message = function(name, channel, isServerSide){ 
-		this.name = name;
-		this.isServerSide = isServerSide;
-		this.id = null;
-		this.channel = channel;
-		this.handlers = [];
-		
-		if(name.length < 2) Throw.formatted('Failed to create message definition on channel "$2": name "$1" is too short.', 'NAME_TOO_SHORT')(name, channel.name);
-		
-		if(this.isOnSenderSide()){
-			this.forceAddHandler(() => {
-				Throw.formatted('Failed to handle incoming message "$1" on channel "$2": message received on wrong side.', 'RECEIVED_ON_WRONG_SIDE')(name, channel.name);
-			}, 'wrong-message-side-error-throwing-handler', 0xffffffff)
-		}
-	}
-	Messenger.Message.prototype = {
-		isOnSenderSide: function(){
-			return this.isServerSide === this.channel.messenger.isServerSide
-		},
-		// creates writer, calls callback to write the data and sends it
-		writeAndSend: function(size, callback){
-			var id = this.id, cid = this.channel.id;
-				
-			if(!cid) failToCreateMessageWriter(this.name, this.channel.name, 'no channel ID defined');
-			if(!id) failToCreateMessageWriter(this.name, this.channel.name, 'no message ID defined');
-			if(!this.isOnSenderSide()) failToCreateMessageWriter(this.name, this.channel.name, 'tried to send message from wrong side');
-			
-			var writer = this.channel.messenger.getDataWriter(cid, id, size);
-			
-			var initialPos = writer.getPosition();
-			
-			callback(writer, () => {
-				var data = writer.getBuffer(),
-					writtenBytes = writer.getPosition() - initialPos;
-			
-				if(writtenBytes !== size){
-					Throw.formatted('Failed to send written message "$1" on channel "$2": expected buffer size not matches actual ($3 !== $4).', 'BUFFER_SIZE_MESSED_UP')
-						(this.name, this.channel.name, size, writtenBytes);
-				}
-				
-				this.channel.messenger.sendArbitraryBinaryData(data);
-			});
-		},
-		
-		removeHandler: function(name){
-			var oldLen = this.handlers.length;
-			this.handlers = this.handlers.filter(h => h.name === name);
-			if(oldLen === this.handlers.len) Throw.formatted('Failed to remove handler "$1" from message "$2" on channel "$3": no handler found.', 'HANDLER_REMOVE_FAILED')
-					(name, this.name, this.channel.name);
-		},
-		
-		addHandler: function(handler, name, priority){
-			if(this.isOnSenderSide()){
-				failToAddHandler(name, priority, this.name, this.channel.name, 'could not handle incoming messages while on sender side')
-			}
-			
-			this.forceAddHandler(handler, name, priority);
-		},
-		
-		forceAddHandler: function(handler, name, priority){
-			name = name || 'default';
-			priority = priority || 0;
-			
-			if(name.length < 2) failToAddHandler(name, priority, this.name, this.channel.name, 'handler name is too short');
-			if(priority < 0 || priority > 0xffffffff || typeof(priority) !== 'number'){
-				failToAddHandler(name, priority, this.name, this.channel.name, 'incorrect priority value');
-			}
-			
-			this.handlers.forEach(h => {
-				if(h.name === name) failToAddHandler(name, priority, this.name, this.channel.name, 'handler with this name is already defined');
-				if(h.priority === priority) failToAddHandler(name, priority, this.name, this.channel.name, 'handler with this priority is already defined');
-			})
-			
-			this.handlers.push({handler: handler, name: name, priority: priority});
-			this.handlers.sort((ha, hb) => ha.priority > hb.priority? -1: 1);
-		},
-		
-		handle: function(message){
-			for(var i = 0; i < this.handlers.length; i++){
-				var isUnhandled = this.handlers[i].handler(message);
-				if(isUnhandled !== false) return;
-			}
-			
-			Throw.formatted('Failed to handle message "$1" on channel "$2": all the handlers failed to handle the message.', 'ALL_HANDLERS_REFUSED')(this.name, this.channel.name);
-		}
-	} 
-	
-	Messenger.Message.BasicTypes = {
+	var basicMessageTypes = Messenger.BasicTypes = {
 		data: 0x00,
 		
 		ping: 0x01,

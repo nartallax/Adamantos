@@ -404,9 +404,9 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 				}
 			});
 			
-			msgr.onStatsUpdate(e => console.log(JSON.stringify(e.data)))
-			
 			msgr.onError(e => (log('Messenger error: '), console.log(e.data.error)));
+			msgr.onStatsUpdate(e => console.log(JSON.stringify(e.data)))
+			msgr.onDisconnect(e => console.log('Disconnected.'))
 			
 			cb && cb(socket);
 		});
