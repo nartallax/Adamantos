@@ -18,6 +18,7 @@ require(__dirname + "/../libs/meta/addict.js")
 			SocketServer = aRequire('nart.net.socket.server'),
 			SocketClient = aRequire('nart.net.socket.client.node'),
 			Messenger = aRequire('nart.net.message.messenger'),
+			ByteManip = aRequire('nart.util.byte.manipulator'),
 			
 			config = aRequire('nart.adamantos.tools.config'),
 			//config = eval('(' + fs.readFileSync(__dirname + '/toolConfig.json', 'utf8') + ')'),
@@ -101,23 +102,26 @@ require(__dirname + "/../libs/meta/addict.js")
 			var testChannel = msgr.createChannel({
 				name: 'test.channel',
 				server: {
-					response: bytes => console.log(bytes.getString())
-				},
-				client: {
 					request: bytes => {
 						var str = bytes.getString();
 						str = str + '|' + str;
-						testChannel.server.response.getWriter((writer, cb) => {
+						testChannel.client.response.writeAndSend(ByteManip.stringSize(str), (writer, cb) => {
 							writer.putString(str);
 							cb();
 						});
 					}
+				},
+				client: {
+					response: bytes => {}//console.log(bytes.getString())
 				}
 			});
 			
+			msgr.onStatsUpdate(e => console.log(e.data))
+			
 			setInterval(() => {
-				testChannel.client.request.getWriter((writer, cb) => {
-					writer.putString(new Date().getTime() + '');
+				var str = new Date().getTime() + '';
+				testChannel.server.request.writeAndSend(ByteManip.stringSize(str), (writer, cb) => {
+					writer.putString(str);
 					cb();
 				});
 			}, 5000);

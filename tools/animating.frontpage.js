@@ -6,6 +6,7 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		SimpleShape = aRequire('nart.gl.shape.simple'),
 		TextureLoader = aRequire('nart.gl.texture.loader'),
 		ShapeLoader = aRequire('nart.gl.shape.loader'),
+		ByteManip = aRequire('nart.util.byte.manipulator'),
 		
 		Board = aRequire('nart.gl.board'),
 		
@@ -388,21 +389,24 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 			var testChannel = msgr.createChannel({
 				name: 'test.channel',
 				server: {
-					response: bytes => console.log(bytes.getString())
-				},
-				client: {
 					request: bytes => {
 						var str = bytes.getString();
+						//console.log('RECEIVED: ' + str);
 						str = str + '|' + str;
-						testChannel.server.response.getWriter((writer, cb) => {
+						testChannel.client.response.writeAndSend(ByteManip.stringSize(str), (writer, cb) => {
 							writer.putString(str);
 							cb();
 						});
 					}
+				},
+				client: {
+					response: bytes => console.log(bytes.getString())
 				}
 			});
 			
-			msgr.onError(e => log('Messenger error: ' + err.data.message));
+			msgr.onStatsUpdate(e => console.log(JSON.stringify(e.data)))
+			
+			msgr.onError(e => (log('Messenger error: '), console.log(e.data.error)));
 			
 			cb && cb(socket);
 		});

@@ -23,7 +23,7 @@ aPackage('nart.net.message.channel', () => {
 					error = 'Unknown message type "' + d.type + '" on channel "' + this.name + '".';
 				}
 			} else {
-				try {
+			-	try {
 					handlers[d.type].call(this, d.data)
 				} catch (e){
 					error = e

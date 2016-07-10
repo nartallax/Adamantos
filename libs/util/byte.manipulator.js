@@ -24,17 +24,24 @@ aPackage('nart.util.byte.manipulator', () => {
 	Manipulator.stringSize = str => {
 		var byteLen = utf8.byteLength(str);
 		if(byteLen > 0x7fffffff) throw new Error('String is too long! Max length: 0x7fffffff, got: 0x' + byteLen.toString(16));
-		
 		return (byteLen <= 0x7f? 1: 4) + byteLen;
 	}
+	
+	Manipulator.fixNeg = num => -num + 0x80000000
+	Manipulator.tryFixNeg = num => num < 0? -num + 0x80000000: num
 	
 	Manipulator.prototype = {
 		getByte: function(){ return this.b[this.pos++] },
 		getSignedByte: function(){ return decodeSign(this.getByte(), 7) },
 		getUshort: function(){ return (this.getByte() << 8) | this.getByte() },
 		getShort: function(){ return decodeSign(this.getUshort(), 15) },
-		getUint: function(){ return (this.getByte() << 24) | (this.getByte() << 16) | (this.getByte() << 8) | this.getByte() },
+		getUint: function(){ return (this.getByte() * 0x1000000) + ((this.getByte() << 16) | (this.getByte() << 8) | this.getByte()) },
 		getInt: function(){ return decodeSign(this.getUint(), 31) },
+		getUlong: function(){ return (this.getUint() * 0x100000000) + this.getUint() },
+		getLong: function(){ 
+			var a = this.getInt(), b = this.getUint();
+			return (a * 0x100000000) + (a < 0? -b: b);
+		},
 		getBytes: function(len){
 			var res = this.b.slice(this.pos, this.pos + len);
 			this.pos += len;
@@ -43,7 +50,7 @@ aPackage('nart.util.byte.manipulator', () => {
 		getString: function(){
 			var lenFirst = this.getByte(),
 				len = lenFirst & 0x80?
-					(lenFirst << 24) | (this.getByte() << 16) | (this.getByte() << 8) | this.getByte():
+					((lenFirst & 0x7f) << 24) | (this.getByte() << 16) | (this.getByte() << 8) | this.getByte():
 					lenFirst;
 		
 			var res = utf8.bytesToStr(this.b, this.pos, this.pos + len);
@@ -57,6 +64,16 @@ aPackage('nart.util.byte.manipulator', () => {
 		putShort: function(u){ this.putUshort(encodeSign(u, 15)) },
 		putUint: function(u){ this.putByte(u >>> 24), this.putByte(u >>> 16), this.putByte(u >>> 8), this.putByte(u) },
 		putInt: function(u){ this.putUint(encodeSign(u, 31)) },
+		// it's not 'real' (u)long: only 52 bits could be used
+		// but it's written using full 8 bytes
+		putUlong: function(u){
+			this.putUint(~~(u / 0x100000000)), this.putUint(u & 0xffffffff)
+		},
+		putLong: function(n){
+			var neg = n < 0;
+			neg && (n = -n);
+			this.putInt((~~(n / 0x100000000)) * (neg? -1: 1)), this.putUint(n & 0xffffffff)
+		},
 		putBytes: function(bytes){ bytes.forEach(b => this.putByte(b)) },
 		putString: function(str){
 			var byteLen = utf8.byteLength(str);
@@ -79,7 +96,12 @@ aPackage('nart.util.byte.manipulator', () => {
 		finished: function(){ return this.pos >= this.b.length },
 		bytesToEnd: function(){ return this.b.length - this.pos },
 		getBuffer: function(){ return this.b },
-		getPosition: function(){ return this.pos }
+		getPosition: function(){ return this.pos },
+
+		stringLength: Manipulator.stringSize,
+		stringSize: Manipulator.stringSize,
+		fixNeg: Manipulator.fixNeg,
+		tryFixNeg: Manipulator.tryFixNeg
 	};
 	
 	return Manipulator;
