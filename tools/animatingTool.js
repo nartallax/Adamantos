@@ -3,6 +3,7 @@ nartallax@gmail.com
 */
 
 require(__dirname + "/../libs/meta/addict.js")
+	.registerOmnipresentPrefix('nart.omnipresent')
 	.addRoot('nart', __dirname + '/../libs')
 	.addRoot('nart.adamantos.tools', __dirname)
 	.main(() => {
@@ -116,7 +117,7 @@ require(__dirname + "/../libs/meta/addict.js")
 				}
 			});
 			
-			msgr.onStatsUpdate(e => console.log(e.data))
+			//msgr.onStatsUpdate(e => console.log(e.data))
 			msgr.onDisconnect(e => {
 				console.log('Disconnected.')
 				clearInterval(dataSendInterval);

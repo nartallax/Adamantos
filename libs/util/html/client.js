@@ -63,7 +63,10 @@ aPackage('nart.util.html.client', () => {
 		if(this.mainPackageName){
 			scripts = this.includedPackages.map(scriptTag).join('\n');
 			styles = this.css.map(styleTag).join('\n');
-			onload = `onload="Addict.main(() => aRequire('` + this.mainPackageName + `')())"`;
+			
+			var omnipresents = Addict.getOmnipresentList().map(name => '.registerOmnipresentPackageName(\'' + name + '\')').join('\n')
+			
+			onload = `onload="Addict` + omnipresents + `.main(() => aRequire('` + this.mainPackageName + `')())"`;
 		}
 		
 		return `<!DOCTYPE html>
