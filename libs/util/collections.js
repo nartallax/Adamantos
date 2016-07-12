@@ -6,10 +6,10 @@ aPackage('nart.util.collections', () => {
 		
 		eachAsync: (arr, action, after, simLimit) => {
 			var count = arr.length;
-			if(count < 1) return setTimeout(after, 1);
+			if(count < 1) return setImmediate(after);
 			var haveLimit = typeof(simLimit) === 'number' && simLimit > 0;
 			
-			var dec = () => ((--count) === 0) && setTimeout(after, 1)
+			var dec = () => ((--count) === 0) && setImmediate(after)
 			
 			if(!haveLimit){
 				
@@ -34,12 +34,12 @@ aPackage('nart.util.collections', () => {
 				cb = () => after(result),
 				count = arr.length;
 			
-			if(arr.length < 1) return setTimeout(cb, 1);
+			if(arr.length < 1) return setImmediate(cb);
 			
 			arr.forEach(item => mapper(item, mapRes => {
 				result.push(mapRes);
 				count--;
-				if(count === 0) setTimeout(cb, 1);
+				if(count === 0) setImmediate(cb);
 			}));
 			
 		},

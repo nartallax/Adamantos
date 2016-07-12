@@ -4,7 +4,7 @@ aPackage('nart.gl.texture.animated', () => {
 		SimpleTexture = aRequire('nart.gl.texture.simple');
 
 	var AnimatedTexture = function(gl, bytesOfFrames, w, h, frameLengthMsec){
-		if(!(this instanceof AnimatedTexture)) return new AnimatedTexture(gl, bytesOfFrames, w, h);
+		if(!(this instanceof AnimatedTexture)) return new AnimatedTexture(gl, bytesOfFrames, w, h, frameLengthMsec);
 		
 		this.gl = gl;
 		this.frames = bytesOfFrames.map(b => this.createFrame(b, w, h));
