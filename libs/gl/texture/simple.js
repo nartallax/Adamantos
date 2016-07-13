@@ -1,13 +1,17 @@
 aPackage('nart.gl.texture.simple', () => {
 
+	var Resource = aRequire('nart.gl.resource.resource'),
+		protoOf = aRequire('nart.util.class').proto;
+
 	var SimpleTexture = function(gl, bytes, w, h){
 		if(!(this instanceof SimpleTexture)) return new SimpleTexture(gl, bytes, w, h);
 			
 		this.gl = gl;
 		this.texture = this.createFrame(bytes, w, h);
+		Resource.call(this);
 	}
 	
-	SimpleTexture.prototype = {
+	SimpleTexture.prototype = protoOf(Resource, {
 		getFrame: function(frameNum){
 			return this.texture;
 		},
@@ -32,7 +36,7 @@ aPackage('nart.gl.texture.simple', () => {
 			
 			return tex;
 		}
-	}
+	})
 	
 	return SimpleTexture;
 

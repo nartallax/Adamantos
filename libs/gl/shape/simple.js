@@ -6,20 +6,10 @@ aPackage('nart.gl.shape.simple', () => {
 		clutil = aRequire('nart.util.class'),
 		glutil = aRequire('nart.gl.util');
 				
-	var SimpleShape = clutil.define(function(data){					
-		if(!(this instanceof SimpleShape)) return new SimpleShape(data);
-		Shape.call(this, data); // all the basic properties
-		
-		this.setHighlightColor(data.highlightColor)
-		
-		if(data.primitives) {
-			this.primitives = data.primitives;
-		} else {
-			this.primitives = [];
-			if(data.vertex && data.vertexIndex && data.textureIndex && data.texture){
-				this.addPrimitive(data.vertex, data.vertexIndex, data.texture, data.textureIndex);
-			}
-		}
+	var SimpleShape = clutil.define(function(gl){
+		if(!(this instanceof SimpleShape)) return new SimpleShape(gl);
+		Shape.call(this, gl); // all the basic properties
+		this.primitives = [];
 	}, {
 		setHighlightColor: function(d){ return this.highlightColor = d, this },
 		

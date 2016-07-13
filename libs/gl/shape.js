@@ -2,30 +2,17 @@ aPackage('nart.gl.shape', () => {
 	"use strict"
 				
 	var defineClass = aRequire('nart.util.class').define,
-		mat4 = aRequire('nart.gl.external.matrix').mat4;
-				
-	var getId = (() => {
-		var i = -0x8fffffff;
-		return () => ++i
-	})();
-
-	var Shape = defineClass(function(data){
+		mat4 = aRequire('nart.gl.external.matrix').mat4,
+		Resource = aRequire('nart.gl.resource.resource');
+		
+	var Shape = defineClass(function(gl){
 		if(!(this instanceof Shape)) return new Shape(data);
 		
-		this.gl = data.gl;
-		
-		this.x = data.x || 0;
-		this.y = data.y || 0;
-		this.z = data.z || 0;
-		
-		this.rotX = data.rotX || 0;
-		this.rotY = data.rotY || 0;
-		this.rotZ = data.rotZ || 0;
+		this.gl = gl;
 		
 		this.matrix = mat4.identity([]);
-		data.matrix && this.setMatrix(data.matrix);
 		
-		this.id = getId();
+		Resource.call(this);
 	}, {
 		clone: function(){ return new this.class(this) },
 		
@@ -62,7 +49,7 @@ aPackage('nart.gl.shape', () => {
 		getX: function(){ return this.x },
 		getY: function(){ return this.y },
 		getZ: function(){ return this.z }
-	})
+	}, Resource);
 	
 	return Shape;
 	
