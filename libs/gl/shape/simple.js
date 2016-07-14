@@ -6,13 +6,10 @@ aPackage('nart.gl.shape.simple', () => {
 		clutil = aRequire('nart.util.class'),
 		glutil = aRequire('nart.gl.util');
 				
-	var SimpleShape = clutil.define(function(gl){
+	var SimpleShape = clutil.define(function(gl){					
 		if(!(this instanceof SimpleShape)) return new SimpleShape(gl);
-		Shape.call(this, gl); // all the basic properties
-		this.primitives = [];
+		Shape.call(this, gl);
 	}, {
-		setHighlightColor: function(d){ return this.highlightColor = d, this },
-		
 		getPrimitives: function(frameNum){
 			return this.primitives
 		},
