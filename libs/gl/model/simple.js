@@ -1,6 +1,6 @@
 /*
-модель - совокупность шейпов
-определяет их взаиморасположение, а также позволяет их анимировать
+модель - совокупность шейпов и данных об их положении
+также модель позволяет их анимировать
 
 задается следующим образом:
 1. модель заполняется шейпами; у каждого шейпа есть 
@@ -28,6 +28,7 @@
 aPackage('nart.gl.model.simple', () => {
 
 	var defineClass = aRequire('nart.util.class').define,
+		DynamicResource = aRequire('nart.gl.resource.resource.dynamic'),
 		Shape = aRequire('nart.gl.shape');
 
 	var Model = defineClass(function(data){
@@ -35,6 +36,8 @@ aPackage('nart.gl.model.simple', () => {
 		
 		this.parts = {};
 		this.animations = {};
+		
+		DynamicResource.call(this);
 	}, {
 		eachAnimation: function(cb){ Object.keys(this.animations).forEach(name => cb(this.animations[name], name)); },
 		eachPart: function(cb){ Object.keys(this.parts).forEach(name => cb(this.parts[name], name)); },
@@ -68,7 +71,7 @@ aPackage('nart.gl.model.simple', () => {
 			
 			this.eachAnimation(a => a.renamePart(oldName, newName));
 		}
-	}, Shape)
+	}, DynamicResource)
 	
 	return Model;
 

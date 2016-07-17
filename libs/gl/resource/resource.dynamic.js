@@ -30,13 +30,20 @@ aPackage('nart.gl.resource.resource.dynamic', () => {
 		addChild: function(res){
 			this.isReferenced && res.reference();
 			this.children[res.id] = res;
+			return res.id;
 		},
 		removeChild: function(res){
 			var id = (res && res.id)? res.id: res;
 			var child = this.children[id];
 			this.isReferenced && res.dereference();
 			delete this.children[id];
-		}
+			return res.id;
+		},
+		
+		free: function(){ /* 
+			dynamic resource, by design, not holds anything in memory, so nothing to free here 
+			children don't need to be freed at this point, as long as they may be referenced by other resource
+		*/ }
 		
 	}
 	

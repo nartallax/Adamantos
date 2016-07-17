@@ -1,19 +1,25 @@
 aPackage('nart.gl.shape.simple', () => {
 	"use strict";
 	
-	var Shape = aRequire('nart.gl.shape'),
-		TextureLoader = aRequire('nart.gl.texture.loader'),
-		clutil = aRequire('nart.util.class'),
+	var clutil = aRequire('nart.util.class'),
 		glutil = aRequire('nart.gl.util');
 				
-	var SimpleShape = clutil.define(function(gl){					
-		if(!(this instanceof SimpleShape)) return new SimpleShape(gl);
-		Shape.call(this, gl);
+	var SimpleShape = clutil.define(function(name, primitives, gl){
+		if(!(this instanceof SimpleShape)) return new SimpleShape(name, gl);
+		this.gl = gl;
+		this.primitives = primitives;
+		Resource.call(this, name, primitives.map(p => p.texture));
 	}, {
-		getPrimitives: function(frameNum){
-			return this.primitives
-		},
+		getPrimitives: function(frameNum){ return this.primitives },
 		
+		free: function(){
+			this.primitives.forEach(p => {
+				this.gl.deleteBuffer(p.vertex);
+				this.gl.deleteBuffer(p.vertexIndex);
+				this.gl.deleteBuffer(p.textureIndex);
+			});
+		}
+		/*
 		addPrimitive: function(vertex, vertexIndex, texture, textureIndex){
 			this.primitives.push({
 				vertex: glutil.bufferOf(this.gl, vertex, 3, this.gl.ARRAY_BUFFER, Float32Array), 
@@ -21,13 +27,9 @@ aPackage('nart.gl.shape.simple', () => {
 				texture: texture, 
 				textureIndex: glutil.bufferOf(this.gl, textureIndex, 2, this.gl.ARRAY_BUFFER, Float32Array)
 			}) 
-		}
-	}, Shape);
-	
-	SimpleShape.defaultTextureLoader = null;
-	
-	SimpleShape.getTextureLoader = () => 
-		SimpleShape.defaultTextureLoader || (SimpleShape.defaultTextureLoader = new TextureLoader(Shape.defaultGl))
+		}*/
+		
+	}, Resource);
 	
 	return SimpleShape;
 	

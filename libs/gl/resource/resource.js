@@ -14,10 +14,12 @@ aPackage('nart.gl.resource.resource', () => {
 	var idCounter = Number.MIN_SAFE_INTEGER;
 	
 	// TODO: maybe split up into separate classes?
-	var Resource = function(children){
+	var Resource = function(name, children){
+		this.name = name;
 		this.refcount = 0;
 		this.id = Resource.generateId();
 		this.children = children || null;
+		this.onCompletelyDereferenced = null;
 	}
 	
 	Resource.generateId = () => idCounter++;
@@ -32,7 +34,18 @@ aPackage('nart.gl.resource.resource', () => {
 		dereference: function(){ 
 			this.refcount--;
 			this.children.forEach(ch => ch.dereference());
-		}
+			this.refcount === 0 && this.onCompletelyDereferenced && this.onCompletelyDereferenced.fire(this);
+		},
+		
+		setCompletelyDereferencingEvent: function(ev){
+			this.onCompletelyDereferenced = ev;
+		},
+		
+		// unload resource from memory
+		// it makes sense to call this function when the reference counter reaches zero
+		// but sometimes we may want to cache it somehow
+		// so this function is called elsewhere
+		free: function(){ throw new Error("Don't know how to free resource."); }
 	}
 	
 	return Resource;
