@@ -35,7 +35,7 @@ aPackage('nart.util.utf8', () => {
 		},
 		
 		bytesToStr: (bytes, start, end) => {
-			var result = '', i = start || 0, len = end || bytes.length, code;
+			var result = '', i = start || 0, len = end || (bytes.length - start), code;
 			while(i < len) {
 				code = bytes[i];
 				if (code < 0x80) {

@@ -17,6 +17,7 @@ aPackage('nart.gl.shape.simple', () => {
 				this.gl.deleteBuffer(p.vertex);
 				this.gl.deleteBuffer(p.vertexIndex);
 				this.gl.deleteBuffer(p.textureIndex);
+				// а текстуры сами удалятся, когда на них референсов не будет больше
 			});
 		}
 		/*
