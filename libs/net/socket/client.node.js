@@ -8,11 +8,13 @@ aPackage('nart.net.socket.client.node', () => {
 		if(!(this instanceof Client)) return new Client(socket)
 		ClientBase.call(this, socket)
 
+		this.ip = this.socket.upgradeReq.connection.remoteAddress;
+	
 		socket.on('message', message => this.messageReceived.fire(message));
 	}
 
 	Client.prototype = clutil.proto(ClientBase, {
-		getIp: function(){ return this.socket.upgradeReq.connection.remoteAddress }
+		getIp: function(){ return this.id }
 	});
 	
 	return Client;

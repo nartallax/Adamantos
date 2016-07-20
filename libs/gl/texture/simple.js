@@ -11,9 +11,9 @@ aPackage('nart.gl.texture.simple', () => {
 		Resource.call(this, name);
 	}
 	
-	SimpleTexture.createFrame = (gl, bytes, w, h, tex, colorMode) => {
+	SimpleTexture.createFrame = (gl, bytes, w, h, colorMode) => {
 		colorMode = gl[colorMode || 'RGBA'];
-		tex = tex || gl.createTexture();
+		var tex = gl.createTexture();
 		
 		gl.bindTexture(gl.TEXTURE_2D, tex);
 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);

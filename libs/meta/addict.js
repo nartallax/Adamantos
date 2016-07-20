@@ -250,7 +250,6 @@ var Addict = (() => {
 				var pr = sourceDirectories[dir];
 				return prefix.startsWith(pr);
 			}).forEach(dir => {
-				console.log(prefix + ' in directory ' + dir);
 				var dirPref = sourceDirectories[dir];
 				fs.readdirRecursive(dir)
 					.map(str => str.replace(dir, ""))

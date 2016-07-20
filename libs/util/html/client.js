@@ -6,13 +6,26 @@ aPackage('nart.util.html.client', () => {
 	var Addict = aRequire('nart.meta.addict'),
 		arrToMapKeys = aRequire('nart.util.clone').arrToMapKeys,
 		escapeHtml = aRequire('nart.util.html').escapeHtml,
-		fs = aRequire.node('fs');
+		fs = aRequire.node('fs'),
+		format = aRequire('nart.util.formatter');
 	
+	var xmlEscape = str => str
+			.replace('&', '&amp')
+			.replace('"', '&quot;')
+			.replace("'", '&apos;')
+			.replace('<', '&lt;')
+			.replace('>', '&gt;');
+	
+	var scriptTagFormat = format('<script type="text/javascript"$1$2>/*<![CDATA[*//*---->*/$3/*--*//*]]>*/</script>'),
+		tagAttr = (k, v, force) => (!v && !force)? '': format(' $1="$2"')(xmlEscape(k), xmlEscape(v));
+		
+	
+	var scriptTagOfText = (text, pkgName, fileName) => {
+		return scriptTagFormat(tagAttr('data-package-name', pkgName), tagAttr('data-source-file', fileName), text);
+	}
 	var scriptTag = pkg => {
 		var file = Addict.fileOf(pkg);
-		return `<script type="text/javascript" data-package-name="` + pkg + `" data-source-file="` + file + `">/*<![CDATA[*//*---->*/
-` + fs.readFileSync(file) + `
-/*--*//*]]>*/</script>`
+		return scriptTagOfText(fs.readFileSync(file), pkg, file);
 	}
 	//var styleTag = file => '<link rel="stylesheet" type="text/css" href="' + file + '">'
 	var styleTag = file => `<style type="text/css" data-source-file="` + file + `">\n` + fs.readFileSync(file) + `\n</style>`;
@@ -61,12 +74,12 @@ aPackage('nart.util.html.client', () => {
 		fonts = fonts.join('\n');
 		
 		if(this.mainPackageName){
-			scripts = this.includedPackages.map(scriptTag).join('\n');
+			scripts = this.includedPackages.map(scriptTag).concat(this.rawScripts.map(text => scriptTagOfText(text))).join('\n');
 			styles = this.css.map(styleTag).join('\n');
 			
 			var omnipresents = Addict.getOmnipresentList().map(name => '.registerOmnipresentPackageName(\'' + name + '\')').join('\n')
 			
-			onload = `onload="Addict` + omnipresents + `.main(() => aRequire('` + this.mainPackageName + `')())"`;
+			onload = format('onload="Addict$1.main(() => aRequire(\'$2\')())"')(omnipresents, this.mainPackageName)
 		}
 		
 		return `<!DOCTYPE html>
@@ -99,6 +112,7 @@ aPackage('nart.util.html.client', () => {
 		this.css = [];
 		this.fonts = {};
 		this.favicon = '';
+		this.rawScripts = [];
 	}
 	
 	Client.prototype = {
@@ -123,6 +137,9 @@ aPackage('nart.util.html.client', () => {
 		},
 		addCss: function(n){ return this.css.push(n), this },
 		addFont: function(file, name){ return (this.fonts[name] = file), this },
+		addScriptText: function(text){
+			this.rawScripts.push(text)
+		},
 		getHtml: getHtml
 	};
 

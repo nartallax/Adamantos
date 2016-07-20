@@ -2,7 +2,8 @@ aPackage('nart.gl.shape.simple', () => {
 	"use strict";
 	
 	var clutil = aRequire('nart.util.class'),
-		glutil = aRequire('nart.gl.util');
+		glutil = aRequire('nart.gl.util'),
+		Resource = aRequire('nart.gl.resource.resource')
 				
 	var SimpleShape = clutil.define(function(name, primitives, gl){
 		if(!(this instanceof SimpleShape)) return new SimpleShape(name, gl);
@@ -20,15 +21,6 @@ aPackage('nart.gl.shape.simple', () => {
 				// а текстуры сами удалятся, когда на них референсов не будет больше
 			});
 		}
-		/*
-		addPrimitive: function(vertex, vertexIndex, texture, textureIndex){
-			this.primitives.push({
-				vertex: glutil.bufferOf(this.gl, vertex, 3, this.gl.ARRAY_BUFFER, Float32Array), 
-				vertexIndex: glutil.bufferOf(this.gl, vertexIndex, 1, this.gl.ELEMENT_ARRAY_BUFFER, Uint16Array),
-				texture: texture, 
-				textureIndex: glutil.bufferOf(this.gl, textureIndex, 2, this.gl.ARRAY_BUFFER, Float32Array)
-			}) 
-		}*/
 		
 	}, Resource);
 	

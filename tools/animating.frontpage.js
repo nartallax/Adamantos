@@ -2,15 +2,12 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 	'use strict';
 
 	var log = aRequire('nart.util.log'),
-		Shape = aRequire('nart.gl.shape'),
 		SimpleShape = aRequire('nart.gl.shape.simple'),
-		TextureLoader = aRequire('nart.gl.texture.loader'),
-		ShapeLoader = aRequire('nart.gl.shape.loader'),
 		ByteManip = aRequire('nart.util.byte.manipulator'),
 		
 		Board = aRequire('nart.gl.board'),
 		
-		toolConfig = aRequire('nart.adamantos.tools.config').animatingTool,
+		config = aRequire('nart.adamantos.config'),
 		
 		SocketClient = aRequire('nart.net.socket.client.browser'),
 		Messenger = aRequire('nart.net.message.messenger');
@@ -381,7 +378,7 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 	}
 		
 	var establishConnection = cb => {
-		SocketClient.connect('ws://' + window.location.hostname + ':' + toolConfig.socketPort, socket => {
+		SocketClient.connect('ws://' + window.location.hostname + ':' + config.net.socket.port, socket => {
 			log('Connection established.');
 			
 			var msgr = new Messenger(socket, false);
@@ -422,12 +419,10 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		resetCam();
 		listenToUserInput();
 		
-		texLoader = new TextureLoader(board.gl);
-		shapeLoader = new ShapeLoader(board.gl, texLoader);
 		var msgr = null;
-		establishConnection(msgr => {
-			window.msgr = msgr = msgr;
-			
+		establishConnection(m => {
+			window.msgr = msgr = m;
+			/*
 			texLoader.downloadAndAddPack('/get_texture_pack', () => {
 				log("Received the texture pack.");
 				
@@ -438,8 +433,14 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 				});
 				
 			});
+			*/
 		});
 		
+		/*
+		texLoader = new TextureLoader(board.gl);
+		shapeLoader = new ShapeLoader(board.gl, texLoader);
+		
+		*/
 		var afterResourcesLoaded = () => {
 		
 			log('Preloaded');

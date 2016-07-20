@@ -4,14 +4,14 @@ aPackage('nart.net.socket.server', () => {
 	var Event = aRequire('nart.util.event'),
 		SocketServer = aRequire.node('ws').Server;
 	
-	var Server = function(port, clientWrapper){
-		if(!(this instanceof Server)) return new Server(port, clientWrapper);
+	var Server = function(port, onClient, cb){
+		if(!(this instanceof Server)) return new Server(port, onClient, cb);
 		
 		this.connected = new Event()
 		
-		var server = new SocketServer({ port: port });
+		var server = new SocketServer({ port: port }, () => cb && cb());
 		
-		server.on('connection', ws => this.connected.fire(clientWrapper(ws)));
+		server.on('connection', ws => this.connected.fire(onClient(ws)));
 	}
 	
 	return Server;
