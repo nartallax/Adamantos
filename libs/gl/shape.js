@@ -1,9 +1,9 @@
-aPackage('nart.gl.shape.simple', () => {
+aPackage('nart.gl.shape', () => {
 	"use strict";
 	
 	var clutil = aRequire('nart.util.class'),
 		glutil = aRequire('nart.gl.util'),
-		Resource = aRequire('nart.gl.resource.resource')
+		Resource = aRequire('nart.e8.resource.static')
 				
 	var SimpleShape = clutil.define(function(name, primitives, gl){
 		if(!(this instanceof SimpleShape)) return new SimpleShape(name, gl);

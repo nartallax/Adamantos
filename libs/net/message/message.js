@@ -1,11 +1,9 @@
 aPackage('nart.net.message.message', () => {
 
-	var Throw = aRequire('nart.util.throw');
-
-	var failToCreateMessageWriter = Throw.formatted('Failed to create writer for message "$1" in channel "$2": $3.', 'WRITER_CREATE_FAILED'),
-		failToAddHandler = Throw.formatted('Failed to add handler "$1" with priority $2 to message "$3" on channel "$4": $5.', 'HANDLER_CREATE_FAILED'),
-		failBasicOnWrongSide = Throw.formatted('Failed to receive message "$1": this messages must not be handled on this side.', 'BASIC_MESSAGE_ON_WRONG_SIDE'),
-		failNotConnected = Throw.formatted('Failed to send message "$1" on channel "$2": not connected.', 'SEND_INTO_DISCONNECTED');
+	var failToCreateMessageWriter = fail.formatted('Failed to create writer for message "$1" in channel "$2": $3.', 'WRITER_CREATE_FAILED'),
+		failToAddHandler = fail.formatted('Failed to add handler "$1" with priority $2 to message "$3" on channel "$4": $5.', 'HANDLER_CREATE_FAILED'),
+		failBasicOnWrongSide = fail.formatted('Failed to receive message "$1": this messages must not be handled on this side.', 'BASIC_MESSAGE_ON_WRONG_SIDE'),
+		failNotConnected = fail.formatted('Failed to send message "$1" on channel "$2": not connected.', 'SEND_INTO_DISCONNECTED');
 	
 	var Message = function(name, channel, isServerSide){ 
 		this.name = name;
@@ -14,11 +12,11 @@ aPackage('nart.net.message.message', () => {
 		this.channel = channel;
 		this.handlers = [];
 		
-		if(name.length < 2) Throw.formatted('Failed to create message definition on channel "$2": name "$1" is too short.', 'NAME_TOO_SHORT')(name, channel.name);
+		if(name.length < 2) fail.formatted('Failed to create message definition on channel "$2": name "$1" is too short.', 'NAME_TOO_SHORT')(name, channel.name);
 		
 		if(this.isOnSenderSide()){
 			this.forceAddHandler(() => {
-				Throw.formatted('Failed to handle incoming message "$1" on channel "$2": message received on wrong side.', 'RECEIVED_ON_WRONG_SIDE')(name, channel.name);
+				fail.formatted('Failed to handle incoming message "$1" on channel "$2": message received on wrong side.', 'RECEIVED_ON_WRONG_SIDE')(name, channel.name);
 			}, 'wrong-message-side-error-throwing-handler', 0xffffffff)
 		}
 	}
@@ -49,7 +47,7 @@ aPackage('nart.net.message.message', () => {
 					writtenBytes = writer.getPosition() - initialPos;
 			
 				if(writtenBytes !== size){
-					Throw.formatted('Failed to send written message "$1" on channel "$2": expected buffer size not matches actual ($3 !== $4).', 'BUFFER_SIZE_MESSED_UP')
+					fail.formatted('Failed to send written message "$1" on channel "$2": expected buffer size not matches actual ($3 !== $4).', 'BUFFER_SIZE_MESSED_UP')
 						(this.name, this.channel.name, size, writtenBytes);
 				}
 				
@@ -66,7 +64,7 @@ aPackage('nart.net.message.message', () => {
 		removeHandler: function(name){
 			var oldLen = this.handlers.length;
 			this.handlers = this.handlers.filter(h => h.name === name);
-			if(oldLen === this.handlers.len) Throw.formatted('Failed to remove handler "$1" from message "$2" on channel "$3": no handler found.', 'HANDLER_REMOVE_FAILED')
+			if(oldLen === this.handlers.len) fail.formatted('Failed to remove handler "$1" from message "$2" on channel "$3": no handler found.', 'HANDLER_REMOVE_FAILED')
 					(name, this.name, this.channel.name);
 		},
 		
@@ -102,7 +100,7 @@ aPackage('nart.net.message.message', () => {
 				if(isUnhandled !== false) return;
 			}
 			
-			Throw.formatted('Failed to handle message "$1" on channel "$2": all the handlers failed to handle the message.', 'ALL_HANDLERS_REFUSED')(this.name, this.channel.name);
+			fail.formatted('Failed to handle message "$1" on channel "$2": all the handlers failed to handle the message.', 'ALL_HANDLERS_REFUSED')(this.name, this.channel.name);
 		}
 	}
 	

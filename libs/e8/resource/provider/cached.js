@@ -1,9 +1,9 @@
 // cached resource provider
 // instead of ResourceProvider, is actually usable 
 // (abstract provider violates general resource contract - one resource = one instance)
-aPackage('nart.gl.resource.provider.cached', () => {
+aPackage('nart.e8.resource.provider.cached', () => {
 	
-	var ResourceProvider = aRequire('nart.gl.resource.provider'),
+	var ResourceProvider = aRequire('nart.e8.resource.provider.abstract'),
 		protoOf = aRequire('nart.util.class').proto;
 		
 	var CachedResourceProvider = function(fetchData, dataToResource){

@@ -1,10 +1,10 @@
-aPackage('nart.gl.texture.provider', () => {
+aPackage('nart.e8.resource.provider.texture', () => {
 	
 	var readGif = aRequire('nart.gl.format.gif.reader'),
 		SimpleTexture = aRequire('nart.gl.texture.simple'),
 		AnimatedTexture = aRequire('nart.gl.texture.animated');
 	
-	var TextureProvider = aRequire('nart.gl.resource.provider.client')
+	var TextureProvider = aRequire('nart.e8.resource.provider.client')
 		.inheritWithChannelAndFabric('core.resource.texture', (textureData, textureName, cb) => {
 			var tex = readGif(textureData.getBuffer(), textureData.getPosition());
 			

@@ -1,8 +1,8 @@
 // загрузчик ресурсов поверх Messenger
-aPackage('nart.gl.resource.loader.messenger', () => {
+aPackage('nart.e8.resource.loader.messenger', () => {
 
 	var protoOf = aRequire('nart.util.class').proto,
-		RequestingLoader = aRequire('nart.gl.resoure.loader.requesting'),
+		RequestingLoader = aRequire('nart.e8.resoure.loader.requesting'),
 		Event = aRequire('nart.util.event'),
 		Manip = aRequire('nart.util.byte.manipulator');
 

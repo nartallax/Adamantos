@@ -1,9 +1,9 @@
 // server-side resource loader
 // composition of smaller loaders
-aPackage('nart.gl.resource.loader.server', () => {
+aPackage('nart.e8.resource.loader.server', () => {
 
-	var FsLoader = aRequire('nart.gl.resource.loader.fs'),
-		MessengerLoader = aRequire('nart.gl.resource.loader.messenger');
+	var FsLoader = aRequire('nart.e8.resource.loader.fs'),
+		MessengerLoader = aRequire('nart.e8.resource.loader.messenger');
 
 	// TODO: learn to find out resource grouping
 	// i.e. if client requested for a model, send him model and also related shapes and textures

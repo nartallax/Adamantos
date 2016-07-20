@@ -28,7 +28,7 @@ aPackage('nart.adamantos.messenger.supplier.server', () => {
 		
 		webSocket: function(port, cb, onConnection){
 			this.socketServer = new SocketServer(port, s => {
-				this.supplyWithDefaultModules(new Messenger(new SocketClient(s), true), onConnection);
+				this.supplyWithDefaultModules(new Messenger(new SocketClient(s), true, this.heartbeat), onConnection);
 				/*
 				var testChannel = msgr.createChannel({
 					name: 'test.channel',

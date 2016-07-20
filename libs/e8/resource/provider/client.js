@@ -1,8 +1,8 @@
 // resource provider on client
-aPackage('nart.gl.resource.provider.client', () => {
+aPackage('nart.e8.resource.provider.client', () => {
 	
-	var CachedProvider = aRequire('nart.gl.resource.provider.cached.timed'),
-		ClientResourceLoader = aRequire('nart.gl.resource.loader.client'),
+	var CachedProvider = aRequire('nart.e8.resource.provider.cached.timed'),
+		ClientResourceLoader = aRequire('nart.e8.resource.loader.client'),
 		protoOf = aRequire('nart.util.class').proto;
 	
 	var ClientResourceProvider = function(cachingTime, messenger, channelName, dataToResource){

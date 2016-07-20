@@ -1,8 +1,8 @@
 // client-side resource loader
 // composition of smaller loaders
-aPackage('nart.gl.resource.loader.client', () => {
+aPackage('nart.e8.resource.loader.client', () => {
 
-	var FsLoader = aRequire('nart.gl.resource.loader.fs');
+	var FsLoader = aRequire('nart.e8.resource.loader.fs');
 
 	var ClientLoader = function(messenger, channelName){
 		// TODO: caches required!

@@ -1,5 +1,5 @@
 // a resource loader that loads resources directly from filesystem
-aPackage('nart.gl.resource.loader.fs', () => {
+aPackage('nart.e8.resource.loader.fs', () => {
 
 	var eachFileRecursiveIn = aRequire('nart.util.fs').eachFileRecursiveIn,
 		eachAsync = aRequire('nart.util.collections').eachAsync,

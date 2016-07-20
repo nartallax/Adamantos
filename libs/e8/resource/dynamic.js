@@ -4,9 +4,9 @@
 
 // there is big difference with typical resources: dynamic resource is instantiated every time it is needed (not once)
 // and could be referenced/dereferenced only once
-aPackage('nart.gl.resource.resource.dynamic', () => {
+aPackage('nart.e8.resource.dynamic', () => {
 	
-	var Resource = aRequire('nart.gl.resource.resource');
+	var Resource = aRequire('nart.e8.resource.static');
 	
 	var DynamicResource = function(){
 		this.children = {};

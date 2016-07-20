@@ -1,7 +1,5 @@
 // подгрузчик ресурсов, умеющий их запрашивать откуда-нибудь и ждать их появления из какого-либо ивента
-aPackage('nart.gl.resource.loader', () => {
-	
-	var Requester = aRequire('nart.net.http.requester');
+aPackage('nart.e8.resource.loader', () => {
 	
 	var RequestingResourceLoader = function(requestFunction, receiveEvent){
 		if(!(this instanceof RequestingResourceLoader)) return new RequestingResourceLoader(requestFunction, receiveEvent);

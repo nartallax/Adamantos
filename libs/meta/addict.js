@@ -362,13 +362,19 @@ var Addict = (() => {
 		
 		dependenciesOf: name => {
 			var deps = dependenciesByName(normalizeName(name));
-			Object.keys(Addict.omnipresentNames).forEach(i => deps[i] = true);
+			Object.keys(Addict.omnipresentNames).forEach(i => {
+				deps[i] = true;
+				Object.keys(dependenciesByName(i)).forEach(key => deps[key] = true)
+			});
 			Object.keys(deps);
 		},
 		dependencyTreeOf: name => {
 			var deps = dependenciesByName(normalizeName(name))
 			for(var i in deps) deps[i] = Addict.dependencyTreeOf(i);
-			Object.keys(Addict.omnipresentNames).forEach(i => deps[i] = true);
+			Object.keys(Addict.omnipresentNames).forEach(i => {
+				deps[i] = true;
+				Object.keys(dependenciesByName(i)).forEach(key => deps[key] = true)
+			});
 			return deps;
 		},
 		dependencyListOf: (() => {
@@ -419,5 +425,7 @@ if(Addict.environment === 'node'){
 	global.aPackage = aPackage;
 	global.aRequire = aRequire;
 }
+
+Addict.global = typeof self === "undefined" ? typeof global === "undefined" ? this : global : self;
 
 aPackage('nart.meta.addict', () => Addict);

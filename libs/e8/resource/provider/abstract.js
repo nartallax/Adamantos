@@ -1,6 +1,6 @@
 // abstract resource provider
 // TODO: reduce boilerplate code amount required to create new class, maybe by some omnipresent utils
-aPackage('nart.gl.resource.provider', () => {
+aPackage('nart.e8.resource.provider.abstract', () => {
 	
 	var Event = aRequire('nart.util.event');
 	

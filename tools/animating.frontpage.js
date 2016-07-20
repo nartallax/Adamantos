@@ -2,7 +2,7 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 	'use strict';
 
 	var log = aRequire('nart.util.log'),
-		SimpleShape = aRequire('nart.gl.shape.simple'),
+		SimpleShape = aRequire('nart.gl.shape'),
 		ByteManip = aRequire('nart.util.byte.manipulator'),
 		
 		Board = aRequire('nart.gl.board'),
@@ -10,41 +10,11 @@ aPackage('nart.adamantos.tools.animating.frontpage', () => {
 		config = aRequire('nart.adamantos.config'),
 		
 		SocketClient = aRequire('nart.net.socket.client.browser'),
-		Messenger = aRequire('nart.net.message.messenger');
+		Messenger = aRequire('nart.net.message.messenger'),
 		
-	var tag = (name, attrs) => {
-		attrs = attrs || {};
-		var result = document.createElement(name);
+		tag = aRequire('nart.util.html').tag;
 		
-		if('class' in attrs) {
-			result.className = attrs['class'];
-			delete attrs['class'];
-		}
-		
-		if('style' in attrs) {
-			result.style.cssText = attrs['style'];
-			delete attrs['style'];
-		}
-		
-		if('text' in attrs){
-			result.textContent = attrs.text;
-			delete attrs.text;
-		}
-		
-		if('children' in attrs){
-			attrs.children.forEach(ch => result.appendChild(typeof(ch) === 'string'? tag('span', {text: ch}): ch))
-			delete attrs.children;
-		}
-		
-		for(var i in attrs) {
-			if(i.startsWith('on')){
-				result[i] = attrs[i] // directly assigned event listeners
-			} else {
-				result.setAttribute(i, attrs[i]);
-			}
-		}
-		return result;
-	}
+	
 	var input = (style, placeholder, update, type, onclick) => tag('input', {
 		type: type || 'text', style: style, placeholder: placeholder, onchange: update, onkeypress: update, onclick: onclick || (() => {})
 	});

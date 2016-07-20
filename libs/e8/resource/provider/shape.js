@@ -1,9 +1,10 @@
-aPackage('nart.gl.shape.provider', () => {
+aPackage('nart.e8.resource.provider.shape', () => {
 	
 	var ObjReader = aRequire('nart.gl.format.obj.reader'),
 		utf8 = aRequire('nart.util.utf8'),
-		ClientProvider = aRequire('nart.gl.resource.provider.client'),
-		eachAsync = aRequire('nart.util.collections').eachAsync;
+		ClientProvider = aRequire('nart.e8.resource.provider.client'),
+		eachAsync = aRequire('nart.util.collections').eachAsync,
+		SimpleShape = aRequire('nart.gl.shape');
 		
 	var textureNamesOf = trs => distinct(trs.map(t => t.textureName));
 	var trianglesWithName = (trs, name) => trs.filter(t => t.textureName === name);

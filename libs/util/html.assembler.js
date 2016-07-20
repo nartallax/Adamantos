@@ -1,4 +1,4 @@
-aPackage('nart.util.html.client', () => {
+aPackage('nart.util.html.assembler', () => {
 	"use strict";
 	
 	//TODO: add client compression/minification
@@ -7,14 +7,8 @@ aPackage('nart.util.html.client', () => {
 		arrToMapKeys = aRequire('nart.util.clone').arrToMapKeys,
 		escapeHtml = aRequire('nart.util.html').escapeHtml,
 		fs = aRequire.node('fs'),
-		format = aRequire('nart.util.formatter');
-	
-	var xmlEscape = str => str
-			.replace('&', '&amp')
-			.replace('"', '&quot;')
-			.replace("'", '&apos;')
-			.replace('<', '&lt;')
-			.replace('>', '&gt;');
+		format = aRequire('nart.util.formatter'),
+		xmlEscape = aRequire('nart.util.html').escapeXml;
 	
 	var scriptTagFormat = format('<script type="text/javascript"$1$2>/*<![CDATA[*//*---->*/$3/*--*//*]]>*/</script>'),
 		tagAttr = (k, v, force) => (!v && !force)? '': format(' $1="$2"')(xmlEscape(k), xmlEscape(v));

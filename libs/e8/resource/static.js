@@ -8,7 +8,7 @@
 // resource's children are not changeable at any point of time
 // it's expected that each resource have fixed children (i.e. model have fixed textures)
 // if there will be need to dynamically reference resources, it will be more wise to use nart.gl.resource.resource.dynamic
-aPackage('nart.gl.resource.resource', () => {
+aPackage('nart.e8.resource.static', () => {
 	
 	// TODO: handle possible overflow
 	var idCounter = Number.MIN_SAFE_INTEGER;

@@ -1,7 +1,7 @@
 // resource provider that removes completely dereferenced resources after a timeout
-aPackage('nart.gl.resource.provider.cached.timed', () => {
+aPackage('nart.e8.resource.provider.cached.timed', () => {
 
-	var CachedResourceProvider = aRequire('nart.gl.resource.provider.cached'),
+	var CachedResourceProvider = aRequire('nart.e8.resource.provider.cached'),
 		protoOf = aRequire('nart.util.class').proto;
 
 	var TimedCachedResourceProvider = function(cachingTimeout, fetchData, dataToResource){

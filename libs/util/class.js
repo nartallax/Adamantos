@@ -2,10 +2,13 @@ aPackage('nart.util.class', () => {
 	"use strict";
 
 	var defineClass = (constr, mix, proto) => {
-		constr.prototype = mixedProto(proto || function(){}, mix || {});
+		constr = constr || function(){};
+		proto = proto || function(){};
+		mix = mix || {};
 		
+		constr.prototype = mixedProto(proto, mix);
 		constr.prototype.class = constr;
-		constr.prototype.super = (proto || function(){}).prototype
+		constr.super = constr.prototype.super = proto.prototype
 		
 		return constr;
 	};

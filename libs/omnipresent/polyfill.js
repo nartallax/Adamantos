@@ -1,7 +1,7 @@
 // polyfill omnipresent package
 // contains polyfills for most widely used functions
 aPackage('nart.omnipresent.polyfill', () => {
-	var glob = typeof self === "undefined" ? typeof global === "undefined" ? this : global : self;
+	var glob = aRequire('nart.meta.addict').global;
 	
 	//TODO: make this shim be more performant, there is some space for it
 	glob.setImmediate || (glob.setImmediate = cb => setTimeout(cb, 0));

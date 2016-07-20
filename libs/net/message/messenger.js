@@ -65,7 +65,6 @@ aPackage('nart.net.message.messenger', () => {
 	"use strict";
 	
 	var ByteManip = aRequire('nart.util.byte.manipulator'),
-		Throw = aRequire('nart.util.throw'),
 		Event = aRequire('nart.util.event'),
 		LimitedQueue = aRequire('nart.util.queue.limited'),
 		Channel = aRequire('nart.net.message.channel'),
@@ -222,7 +221,7 @@ aPackage('nart.net.message.messenger', () => {
 				msgCount = Object.keys(clientMap) + Object.keys(serverMap);
 			
 			if(msgCount > 0xfe){
-				Throw.formatted('Could not generate definition for channel "$1": too many messages defined (max: $2, have: $3)', 'TOO_MANY_MESSAGES')
+				fail.formatted('Could not generate definition for channel "$1": too many messages defined (max: $2, have: $3)', 'TOO_MANY_MESSAGES')
 					(this.name, 0xfe, msgCount);
 			}
 			
@@ -254,7 +253,7 @@ aPackage('nart.net.message.messenger', () => {
 		
 		setupHeartbeat: function(config){
 			if(this.heartbeatSendHandle){
-				Throw.formatted('Failed to setup heartbeat: heartbeat already set up.', 'DUPLICATE_HEARTBEAT_SETUP')();
+				fail.formatted('Failed to setup heartbeat: heartbeat already set up.', 'DUPLICATE_HEARTBEAT_SETUP')();
 			}
 			this.heartbeatSendHandle = true;
 			
@@ -332,7 +331,7 @@ aPackage('nart.net.message.messenger', () => {
 			var channel = this.channels[this.channelIdNameMap[id]];
 				
 			if(!channel){
-				Throw.formatted('Failed to handle message: have no channel with ID $1.', 'ABSENT_DEFINITION')(id);
+				fail.formatted('Failed to handle message: have no channel with ID $1.', 'ABSENT_DEFINITION')(id);
 			}
 			
 			return channel;
@@ -373,7 +372,7 @@ aPackage('nart.net.message.messenger', () => {
 					if(this.isServerSide) failBasicOnWrongSide('undefine_channel');
 					return this.readGetChannelOrThrow(data).undefine();
 				default:
-					Throw.formatted('Failed to process the message: unknown type code $1.', 'UNKNOWN_BASIC_MESSAGE_TYPE')(basicType);
+					fail.formatted('Failed to process the message: unknown type code $1.', 'UNKNOWN_BASIC_MESSAGE_TYPE')(basicType);
 					
 			}
 		}

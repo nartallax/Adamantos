@@ -2,7 +2,7 @@
 aPackage('nart.adamantos.client.seeder', () => {
 	
 	var HttpServer = aRequire('nart.net.http.server'),
-		htmlAssembler = aRequire('nart.util.html.client'),
+		HtmlAssembler = aRequire('nart.util.html.assembler'),
 		
 		zlib = aRequire.node('zlib'),
 		err = aRequire('nart.util.err');
@@ -20,7 +20,7 @@ aPackage('nart.adamantos.client.seeder', () => {
 		if(!(this instanceof Seeder)) return new Seeder(rootPackage, title, cb);
 		
 		this.html = null;
-		var client = new htmlAssembler()
+		var client = new HtmlAssembler()
 			.setTitle(title)
 			.setFavicon(__dirname + '/../violet_gem.png')
 			.setMainPackage(rootPackage);
@@ -53,7 +53,7 @@ aPackage('nart.adamantos.client.seeder', () => {
 							'Content-Length': this.html.length,
 							'Content-Encoding': 'gzip'
 						});
-						res.write(html);
+						res.write(this.html);
 					}
 					res.end();
 				});
