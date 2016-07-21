@@ -3,7 +3,6 @@ aPackage('nart.gl.format.obj.reader', () => {
 	
 	var readLines = aRequire('nart.util.fs').readLines,
 		MtlReader = aRequire('nart.gl.format.mtl.reader'),
-		mapAsync = aRequire('nart.util.collections').mapAsync,
 		path = aRequire.node('path');
 	
 	ObjReader = {
@@ -33,7 +32,7 @@ aPackage('nart.gl.format.obj.reader', () => {
 		
 		readMaterialsWithPaths: (obj, cb) => {
 			ObjReader.readMaterialsOnly(obj, data => {
-				mapAsync(data.mtl, (mtl, cb) => MtlReader.read(mtl, cb), matMaps => {
+				data.mtl.mapAsync((mtl, cb) => MtlReader.read(mtl, cb), matMaps => {
 					var matMap = {};
 					
 					matMaps.forEach(mmap => {

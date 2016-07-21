@@ -2,7 +2,6 @@
 aPackage('nart.e8.resource.loader.fs', () => {
 
 	var eachFileRecursiveIn = aRequire('nart.util.fs').eachFileRecursiveIn,
-		eachAsync = aRequire('nart.util.collections').eachAsync,
 		fs = aRequire.node('fs'),
 		err = aRequire('nart.util.err');
 
@@ -48,7 +47,7 @@ aPackage('nart.e8.resource.loader.fs', () => {
 			
 			var mapping = {};
 			
-			eachAsync(this.baseDirs, (baseDir, cb) => {
+			this.baseDirs.eachAsync((baseDir, cb) => {
 				eachFileRecursiveIn(baseDir, 
 					path => path.toLowerCase().match(this.filenameFilter) && (mapping[pathToName(path)] = path), 
 					cb

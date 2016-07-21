@@ -3,12 +3,11 @@ aPackage('nart.util.fs', () => {
 	var log = aRequire('nart.util.log'),
 		fs = aRequire.node('fs'),
 		path = aRequire.node('path'),
-		err = aRequire('nart.util.err'),
-		eachAsync = aRequire('nart.util.collections').eachAsync;
+		err = aRequire('nart.util.err');
 
 	var rmDir = (path, cb) => {
 		fs.readdir(path, err(files => {
-			eachAsync(files || [], (f, cb) => {
+			(files || []).eachAsync((f, cb) => {
 				f = path + '/' + f;
 				fs.stat(f, err(stat => {
 					if(!stat) return;
@@ -23,7 +22,7 @@ aPackage('nart.util.fs', () => {
 	
 	var eachFileRecursive = (dirPath, onFile, after) => {
 		fs.readdir(dirPath, err(files => {
-			eachAsync(files || [], (f, cb) => {
+			(files || []).eachAsync((f, cb) => {
 				f = path.join(dirPath, f);
 				fs.stat(f, err(stat => {
 					if(!stat) return;
@@ -112,7 +111,7 @@ aPackage('nart.util.fs', () => {
 		// do not alters the order of the items, just removes some of them
 		filterExisting: (paths, cb, onError) => {
 			var emap = {};
-			eachAsync(paths, (file, cb) => {
+			paths.eachAsync((file, cb) => {
 				fs.stat(file, (e, data) => {
 					if(e){
 						if(!e.message.startsWith('ENOENT')) (onError || log)(e);

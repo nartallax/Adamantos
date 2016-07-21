@@ -3,10 +3,9 @@ aPackage('nart.e8.resource.provider.shape', () => {
 	var ObjReader = aRequire('nart.gl.format.obj.reader'),
 		utf8 = aRequire('nart.util.utf8'),
 		ClientProvider = aRequire('nart.e8.resource.provider.client'),
-		eachAsync = aRequire('nart.util.collections').eachAsync,
 		SimpleShape = aRequire('nart.gl.shape');
 		
-	var textureNamesOf = trs => distinct(trs.map(t => t.textureName));
+	var textureNamesOf = trs => trs.map(t => t.textureName).distinct();
 	var trianglesWithName = (trs, name) => trs.filter(t => t.textureName === name);
 	
 	var eachNestedValue = (trs, field, cb) => {
@@ -56,7 +55,7 @@ aPackage('nart.e8.resource.provider.shape', () => {
 			var triangles = ObjReader.objLinesToTrianglesWithTextureNames(lines);
 			var primitives = [];
 		
-			eachAsync(textureNamesOf(triangles), (textureName, cb) => {
+			textureNamesOf(triangles).eachAsync((textureName, cb) => {
 				this.textureProvider.get(textureName, texture => {
 					var trs = trianglesWithName(triangles, textureName);
 									

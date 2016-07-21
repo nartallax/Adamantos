@@ -4,7 +4,6 @@ aPackage('nart.util.html.assembler', () => {
 	//TODO: add client compression/minification
 	//TODO: use nart.util.script.assembler maybe?
 	var Addict = aRequire('nart.meta.addict'),
-		arrToMapKeys = aRequire('nart.util.clone').arrToMapKeys,
 		escapeHtml = aRequire('nart.util.html').escapeHtml,
 		fs = aRequire.node('fs'),
 		format = aRequire('nart.util.formatter'),
@@ -120,7 +119,7 @@ aPackage('nart.util.html.assembler', () => {
 				rawDeps = Addict.dependencyListOf(name);
 			});
 			
-			var deps = arrToMapKeys(rawDeps);
+			var deps = rawDeps.toMap();
 			
 			deps[name] = true;
 			deps['nart.meta.addict'] = true;

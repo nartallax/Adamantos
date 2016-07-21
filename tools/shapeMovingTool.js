@@ -42,8 +42,6 @@ require(__dirname + "/../libs/meta/addict.js")
 			mkDir = aRequire('nart.util.fs').mkDir,
 			putFile = aRequire('nart.util.fs').putFile,
 			eachFileRecursiveIn = aRequire('nart.util.fs').eachFileRecursiveIn,
-			distinct = aRequire('nart.util.collections').distinct,
-			eachAsync = aRequire('nart.util.collections').eachAsync,
 			readGif = aRequire('nart.gl.format.gif.reader'),
 			
 			path = aRequire.node('path'),
@@ -106,7 +104,7 @@ require(__dirname + "/../libs/meta/addict.js")
 					}
 					
 					var nonSupportedTextures = [];
-					eachAsync(texturePaths, (path, cb) => isCorrectGif(path, result => {
+					texturePaths.eachAsync((path, cb) => isCorrectGif(path, result => {
 						if(!result){
 							nonSupportedTextures.push(path);
 						}
@@ -140,7 +138,7 @@ require(__dirname + "/../libs/meta/addict.js")
 			}, () => {
 				console.log('Found ' + files.length + ' raw shapes.');
 				
-				eachAsync(files, (path, cb) => {
+				files.eachAsync((path, cb) => {
 					console.log('Processing ' + path);
 					transferModel(path, cb)
 				}, onOperationCompleted, 1);
@@ -171,7 +169,7 @@ require(__dirname + "/../libs/meta/addict.js")
 			return op
 		});
 		
-		eachAsync(getOps(), (op, cb) => {
+		getOps().eachAsync((op, cb) => {
 			runFor(op.raw.texture, op.raw.shape, op.source.texture, op.source.shape, cb);
 		}, onWorkDone);
 		

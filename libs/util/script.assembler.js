@@ -2,7 +2,6 @@
 aPackage('nart.util.script.assembler', () => {
 
 	var Addict = aRequire('nart.meta.addict'),
-		eachAsync = aRequire('nart.util.collections').eachAsync,
 		log = aRequire('nart.util.log'),
 		fs = aRequire.node('fs');
 
@@ -32,7 +31,7 @@ aPackage('nart.util.script.assembler', () => {
 				
 			var code = {};
 				
-			eachAsync(files, (f, cb) => {
+			files.eachAsync((f, cb) => {
 				fs.readFile(f, 'utf8', (e, data) => {
 					e && log(e);
 					code[f] = data;

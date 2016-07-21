@@ -1,431 +1,284 @@
 /*
-	package/dependency managing system
-	
-	allows to define packages like aPackage('nart.libs.something', () => { ... return Something; })
-	allows to require such packages as var Something = aRequire('nart.libs.something')
-	allows to define application entry point as Addict.main(() => { ... })
-	
-	explicitly disallowed (will fail):
-		circular dependencies
-		require()ing something asynchronously
-		package definitions that does not return truthy result
-	
-	it's expected and highly encouraged:
-		not to rely on any platform-depending functionality on synchronous definition time
-			it could make graph building impossible
-		define exactly one package per file
-			otherwise, some heisenbugs with 'definition not found' could occur
-		for definition function not to have any side-effects
-			at least at syncronous definition time
-			definition function could be executed arbitrary number of times
-	
-	acts as platform abstraction level. supports browser(s) and node.js
-	
-	on browser, packages should be included on page in some way
-	that is, addict expects all require()'d packages to be defined at point of requirement
-		
-	on node.js, packages could be included as well as be placed in some specific place
-	example: we have package a.b.c.d.e
-	to include it, we should:
-	1. define root: Addict.addRoot('a.b', '/home/nart/node-libs')
-	it's expected now that directory "/home/nart/node-libs" contains only packages inside module a.b
-	it could be more than one root defined, but not on single directory
-	2. put file in place with appopriate naming
-	2.1. traditional directory style: /home/nart/node-libs/c/d/e.js
-	2.2. flat style: /home/nart/node-libs/c.d.e.js
-	2.3. mix of two previous styles: /home/nart/node-libs/c/d.e.js
-	
-	there also omnipresent packages.
-	such packages usually contains something that could be used everywhere: some shims, prototype extensions etc
-	
-	TODO: rewrite this all, now it's just a mess (yet it's working)
+the Addict package management system (second edition)
+
+meant to rule the packages, require them, finding out their dependencies and so on
+
+is all synchronous by design, so better not use it after startup
 */
 var Addict = (() => {
-	'use strict';
 	
-	var startTimeoutHandle = null;
-	
-	var sourceDirectories = {};
-	
-	var packages = {};
-	
-	var isValidName = n => n.match(/^(?:[a-zA-Z\d]+\.)*[a-zA-Z\d]+$/)? true: false;
-	var normalizeName = n => n.replace(/[^A-Za-z\d\.]/, '').toLowerCase()
-	var pathToName = path => normalizeName(path.replace(/.[^.\\\/]+$/, '').split(/[\\\/]/).filter(p => p).join('.'));
-	
-	var FsCache = (() => {
-			
-		var FsCache = function(){
-			this._readdir = {};
-			this._stat = {};
+	// просто структура данных, без какой-либо специализации
+	var Stack = (() => {
+		
+		var Stack = function(){
+			this.data = [];
 		}
 		
-		FsCache.prototype = {
-			fs: function(){ return this._fs || (this._fs = require('fs')) },
-			readdir: function(path){ return this._readdir[path] || (this._readdir[path] = this.fs().readdirSync(path)) },
-			stat: function(path){ return this._stat[path] || (this._stat[path] = this.fs().statSync(path)) },
-			getSep: function(){ return this._sep || (this._sep = require('path').sep) },
-			readdirRecursive: function(dir, res){
-				res = res || [];
-				var sep = this.getSep();
-				
-				this.readdir(dir)
-					.forEach(file => {
-						file = dir + sep + file;
-						this.stat(file).isDirectory()?
-							this.readdirRecursive(file, res):
-							res.push(file)
-					});
-				
-				return res;
+		Stack.prototype = {
+			getSize: function(){ return this.data.length },
+			isEmpty: function(){ return this.data.length === 0 },
+			push: function(data){ this.data.push(data) },
+			pop: function(){ return this.data.pop() },
+			peek: function(){ return this.data[this.data.length - 1] },
+			toString: function(prefix){ 
+				prefix = typeof(prefix) === 'string'? prefix: '\t';
+				return prefix + this.data.map(el => prefix + el + '').join('\n') 
 			}
 		}
 		
-		return FsCache;
-		
+		return Stack;
 	})();
 	
-	var fs = new FsCache();
-	
-	var fileOfPackage;
-	
-	(() => {
+	// один пакет
+	// мутабельный объект; в ходе своего жизненного цикла приобретает атрибуты, зависимости, исполняет definition и т.д.
+	var Package = (() => {
 		
-		var splitNamePath = p => {
-			p = normalizeName(p)
-			return p.length === 0? []: p.split('.')
-		}
-		
-		var moduleDirName = (part, path) => {
-			var dirs = fs.readdir(path).filter(p => normalizeName(p) === part)
-			if(dirs.length > 1) throw new Error('Ambiguity detected while resolving module ' + part + ': "' + dirs.join('", "') + '"');
-			return dirs[0]
-		}
-		
-		var packageFileName = (parts, path) => {
-			var name = parts.join('.')
+		function(name, definition, fail){
+			this.name = name;
+			this.definition = definition;
+			this.fail = fail;
 			
-			var paths = fs.readdir(path)
-				.filter(p => p.toLowerCase().match(/\.js\s*$/)? true: false)
-				.filter(p => normalizeName(p.replace(/\.[Jj][Ss]\s*$/, "")) === name)
-				
-			if(paths.length > 1) throw new Error('Ambiguity detected while resolving package ' + name + ': "' + paths.join('", "') + '"');
+			this.isExecuted = false;
 			
-			return paths[0];
-		}
-		
-		var withoutFirst = (parts, n) => {
-			var res = [];
-			for(var i = typeof(n) === 'number'? n: 1; i < parts.length; i++) res.push(parts[i]);
-			return res;
-		}
-		
-		var searchFileIn = (parts, path) => {
+			// результат выполнения definition
+			this.product = null;
 			
-			if(parts.length > 1){
-				var mod = moduleDirName(parts[0], path);
-				if(mod){
-					var result = searchFileIn(withoutFirst(parts), path + '/' + mod)
-					if(result) return result;
-				}
-			}
+			// список имен пакетов, от которых явно зависит данный
+			// не включает omnipresent-ы
+			this.dependencies = [];
 			
-			var pak = packageFileName(parts, path);
-			if(pak) return path + '/' + pak;
-			
-			return null;
+			// набор флагов, описывающих пакет
+			this.attributes = {
+				isOmnipresent: false
+			};
 		}
 		
-		var startsWith = (small, big) => {
-			for(var i in small) if(big[i] !== small[i]) return false;
-			return true;
-		}
-		
-		var searchFile = fileOfPackage = name => {
-			var dirs = sourceDirectories, 
-				parts = splitNamePath(name),
-				file;
-				
-			for(var directoryName in dirs){
-				var mparts = splitNamePath(normalizeName(dirs[directoryName]))
-				if(!startsWith(mparts, parts)) continue;
-				file = searchFileIn(withoutFirst(parts, mparts.length), directoryName);
-				if(file) break;
-			}
-			
-			return file;
-		}
-		
-	})();
-	
-	var PackageStack = (() => {
-	
-		var PackageStack = function(){
-			this.stack = [];
-			this.map = {};
-		}
-		
-		PackageStack.prototype = {
-			push: function(name){
-				if(this.map[name]) throw new Error('Circular dependency: ' + this.stack.join(' -> ') + ' -> ' + name);
-				this.stack.push(name);
-				this.map[name] = true;
+		Package.prototype = {
+			executeDefinition: function(){
+				this.product = this.definition.call(null);
+				this.product || this.isOmnipresent || this.fail('Failed to execute a package ' + this.name + ': no valuable result received.');
 			},
-			pop: function(){
-				var result = this.stack.pop();
-				delete this.map[result]
-				return result
+			addDependency: function(name){ this.dependencies.push(name) },
+			toString: function(){ return 'package(' + this.name + ')' }
+		}
+		
+		return Package;
+		
+	})();
+	
+	// словарь пакетов
+	// ответственнен за хранение пакетов, а также их своевременное определение и назначение им зависимостей
+	var PackageDictionary = (() => {
+		
+		// discoverByName - функции поиска пакетов по имени
+		// ожидается, что он не вернет пакет, а вызовет функцию его определения
+		// функция определения передается в функцию поиска
+		// (и вообще, см. PackageDiscoverer)
+		var PackageDictionary = function(discoverByName){
+			// стек из пакетов, definition которых исполняется в данный момент
+			// необходим для отслеживания набора зависимостей, которые имеет определенный пакет
+			this.packageStack = new Stack();
+			
+			this.packages = {};
+			
+			this.discoverByName = discoverByName;
+		}
+		
+		PackageDictionary.prototype = {
+			fail: function(message){ throw new Error(message + '\nPackage requisition stack:\n' + this.packageStack) },
+			getStackSize: function(){ return this.packageStack.getSize() },
+			definePackage: function(name, definition){ this.packages[name] = new Package(name, definition, msg => this.fail(msg)) },
+			
+			getPackage: function(name){
+				if(name in this.packages) return this.packages[name];
+				this.discoverByName(name, (name, def) => this.definePackage(name, def));
+				name in this.packages || this.fail('Failed to find package ' + name);
+				return this.packages[name];
 			},
-			peek: function(){ return this.stack[this.stack.length - 1] }
-		}
+			
+			getExecutedPackage: function(name){
+				var pkg = this.getPackage(name);
+				pkg.isExecuted || this.executePackage(pkg);
+				return pkg;
+			},
 		
-		return PackageStack;
+			executePackage: function(pkg){
+				this.packageStack.push(pkg);
+				pkg.executeDefinition();
+				this.packageStack.pop();
+			},
+			
+			getProduct: function(name){ return this.getExecutedPackage(name).product },
+			/*
+			// публичный АПИ
+			
+			// вызывается, когда какой-либо пакет хочет запросить зависимость
+			processProductRequest: function(name){
+				this.packageStack.isEmpty() && this.fail('Failed to satisfy dependency: required outside of package definition (or asynchronously).');
+				this.packageStack.peek().addDependency(name);
+				return this.getProduct(name);
+			},
+			
+			// вызывается, когда какой-либо пакет хочет определиться
+			processDefinitionRequest: function(name, definition){
+				this.packageStack.isEmpty() || this.fail('Failed to define package: package nesting is not allowed.');
+				this.definePackage(name, definition);
+			},
+			
+			// вызывается в случае, когда непонятно, определяется ли пакет или запрашивается
+			processRequest: function(name, definition){
+				return typeof(definition) === 'function'? this.processDefinitionRequest(name, definition): this.processProductRequest(name);
+			}
+			*/
+		}
+	
+		return PackageDictionary;
 		
 	})();
 	
-	var packageStack = new PackageStack(),
-		isMainExecuting = false; // костыль, чтобы можно было require()ить из кода main зависимости
-	
-	var getPackage, dependenciesByName, moduleNamesWithPrefix;
-	(() => {
+	// словарь, умеющий учитывать omnipresent-ы
+	// базируется на другом словаре
+	var OmnipresentDictionary = (() => {
 		
-		var dependenciesOfName = dependenciesByName = name => {
-			if(!(name in packages)) discoverPackage(name);
-			return dependenciesOf(packages[name]);
+		var OmnipresentDictionary = function(baseDictionary, discoverByPrefix){
+			this.base = baseDictionary;
+			this.discoverByPrefix = discoverByPrefix;
+			this.omnipresents = {};
 		}
 		
-		var dependenciesOf = pkg => {
-			if(!pkg) return null;
-			if(!('dependencies' in pkg)) activatePackage(pkg);
-			var deps = {};
-			Object.keys(pkg.dependencies).forEach(i => deps[i] = true);
-			// omnipresents are counted not here - only after everything else is counted
-			//Object.keys(Addict.omnipresentNames).forEach(i => deps[i] = true);
-			return deps;
-		}
-		
-		var productOfName = name => {
-			if(!(name in packages)) discoverPackage(name);
-			return productOf(packages[name]);
-		}
-		
-		var productOf = pkg => {
-			if(!pkg) return null;
-			if('product' in pkg) return pkg.product;
-			return activatePackage(pkg)
-		}
-		
-		var activatePackage = def => {
-			packageStack.push(def.packageName);
-			def.dependencies = {};
-			def.product = def();
-			packageStack.pop()
+		OmnipresentDictionary.prototype = {
+			registerPackage: function(name){
+				this.base.getPackage().attributes.isOmnipresent = true;
+				this.omnipresents[name] = true;
+			},
 			
-			return def.product
-		}
-		
-		var fileOrThrow = name => {
-			var file = fileOfPackage(name);
-			if(!file) throw new Error('Failed to resolve ' + name);
-			return file;
-		}
-		
-		var discoverPackage = name => {
-			switch(Addict.realEnvironment){
-				case 'node': return Addict.require.node(fileOrThrow(name));
-				case 'browser': return; /* no autodiscovery for browsers */
-			}
-		};
-		
-		var productOfNameOrThrow = getPackage = (name, allowEmpty) => {
-			var pkg = productOfName(name)
-			if(!pkg && !allowEmpty) throw new Error('Could not load ' + name + '. Maybe some definition mistakes?');
-			return pkg;
-		}
-		
-		moduleNamesWithPrefix = prefix => {
-			var result = [];
+			registerPrefix: function(prefix){
+				discoverByPrefix(prefix, (name, def) => {
+					this.base.definePackage(name, def)
+					this.registerPackage(name);
+				});
+			},
 			
-			Object.keys(sourceDirectories).filter(dir => {
-				var pr = sourceDirectories[dir];
-				return prefix.startsWith(pr);
-			}).forEach(dir => {
-				var dirPref = sourceDirectories[dir];
-				fs.readdirRecursive(dir)
-					.map(str => str.replace(dir, ""))
-					.map(str => dirPref + '.' + pathToName(str))
-					.filter(name => name.startsWith(prefix))
-					.forEach(name => result.push(name));
-			})
-			
-			return result;
+			getOmnipresents: function(){ return Object.keys(this.omnipresents) }
 		}
+		
+		return OmnipresentDictionary;
 		
 	})();
 	
-	var Addict = {
-		package: (name, body) => {
-			if(!isValidName) throw new Error('Package name ' + name + ' is not valid.');
-			
-			name = normalizeName(name);
-			
-			if(name in packages) throw new Error('Duplicate definition of ' + name);
-			
-			body.packageName = name;
-			packages[name] = body;
-		},
+	// некоторый хитрый объект, умеющий изменять код пакетов и исполнять этот код
+	// например, дописывать "use strict" в начало определения
+	// также возможны разного рода макрозамены
+	var CodeManipulator = (() => {
 		
-		require: (() => {
-			var req = (name, allowEmpty, allowAsync) => {
-				name = normalizeName(name)
-				
-				var requiringPackage = packageStack.peek();
-				if(typeof(requiringPackage) === 'string'){
-					packages[requiringPackage].dependencies[name] = true;
-				} else if(!isMainExecuting && !allowAsync) {
-					throw new Error('Package ' + name + ' is required asynchronously. Such requisitions are not allowed.');
-				}
-				
-				return getPackage(name, allowEmpty)
+		var CodeManipulator = function(fail, exceptionCodeLength){
+			this.fail = fail;
+			this.exceptionCodeLength = exceptionCodeLength || 150;
+			this.fixAndRun = code => this.fixAndRunCode(code);
+		}
+		
+		CodeManipulator.prototype = {
+			packageHeaderRegexp: /^.*?(?:[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]\s*\(.*?\)\s*\{|=>(?:\s*\{)?)/,
+			
+			failWithCode: function(msg, code){
+				code = code.length > this.exceptionCodeLength? code.substr(0, exceptionCodeLength - 3) + '...': code;
+				this.fail(msg + '\nCode: ' + code);
+			},
+			
+			fixCode: function(code){ return this.ensureStrictMode(code) },
+			
+			ensureStrictMode: function(code){
+				var header = (code.match(packageHeaderRegexp) || [])[0];
+				header || this.failWithCode('Failed to extract header from package code.', code);
+				return header + '"use strict";' + code.replace(this.packageHeaderRegexp, '')
+			},
+			
+			// TODO: think about other options, such as new Function(code); maybe they will be worth it
+			runCode: function(code){ return eval(code) },
+			
+			fixAndRunCode: function(code){ return this.runCode(this.fixCode(code)) }
+		}
+		
+		return CodeManipulator;
+		
+	})();
+	
+	// искатель пакетов. знает, откуда их брать. абстрактен.
+	// опирается на стек обработчиков определения пакета
+	// т.о. не получает описание пакетов напрямую, а делает какие-то действия,
+	//		после которых вызывается функция определения пакета (наверху этого стека)
+	// наиболее вероятное действие - исполнение кода определения; 
+	// этот код вызовет глобальную функцию определения, а она уже вызовет функцию наверху стека
+	// ... но возможны варианты.
+	var PackageDiscoverer = (() => {
+		
+		var PackageDiscoverer = function(handlerStack){
+			if(!handlerStack) return this; // we should be used as prototype constructor
+			
+			// стек из обработчиков определения пакета
+			// теоретически, обработчики могут быть вложены друг в друга
+			// а также единого синглтон-правильного обработчика нет
+			// поэтому следует хранить их так
+			
+			// идеологически, ни один пакет не определяется самостоятельно; все пакеты определяются только "по запросу"
+			// т.о. нет никакой нужды иметь единственно правильный обработчик всегда
+			this.definitionHandlerStack = handlerStack;
+			
+			this.discoverByName = (name, onPackageFound) => {
+				this.withHandler(onPackageFound, () => this.findPackageByName(name));
 			}
 			
-			req.node = typeof(require) !== 'undefined' && require.main && typeof(require.main.require) === 'function'?
-				name => require.main.require(name): // for node external packages
-				name => "NO_PACKAGE"; // we are not in node environment, could not load the package
-			
-			return req;
-		})(),
-		
-		main: body => {
-			if(startTimeoutHandle !== null) {
-				clearTimeout(startTimeoutHandle);
-				throw new Error('More than one entry points detected.');
+			this.discoverByPrefix = (prefix, onPackageFound) => {
+				this.withHandler(onPackageFound)
 			}
-			
-			startTimeoutHandle = setTimeout(() => {
-				isMainExecuting = true;
-				body();
-				isMainExecuting = false;
-			}, 1);
-		},
-		environments: ['node', 'browser'],
-		environment: typeof(module) === 'undefined'? 'browser': 'node',
-		addRoot: (module, dir) => {
-			if(!isValidName(module) && module.length > 1) throw new Error('Invalid module name: ' + module);
-			if(sourceDirectories[dir]) throw new Error('Directory "' + dir + '" could not be registered as root of module ' + module + ': its already registered as root of module ' + sourceDirectories[dir]);
-			sourceDirectories[dir] = normalizeName(module);
-			
-			Addict.resetOmnipresentLoadStatusByPrefix(normalizeName(module))
-			Addict.loadOmnipresents();
-			
-			return Addict;
-		},
+		}
 		
-		// TODO: optimize omnipresents somehow
-		omnipresentNames: {},
-		omnipresentPrefixes: {},
-		
-		getOmnipresentList: () => Object.keys(Addict.omnipresentNames),
-		
-		registerOmnipresentPrefix: prefix => {
-			prefix = normalizeName(prefix);
-			Addict.omnipresentPrefixes[prefix] = false;
-			Addict.loadOmnipresentsByPrefix(prefix);
-			return Addict;
-		},
-		
-		registerOmnipresentPackageName: name => {
-			name = normalizeName(name);
-			Addict.omnipresentNames[name] = true;
-			Addict.require(name, true, true);
-			return Addict;
-		},
-		
-		resetOmnipresentLoadStatusByPrefix: prefix => {
-			Object.keys(Addict.omnipresentNames)
-				.filter(name => prefix.startsWith(name) || name.startsWith(prefix))
-				.forEach(name => Addict.omnipresentNames[name] = false);
-		},
-		
-		loadOmnipresents: () => {
-			Object.keys(Addict.omnipresentPrefixes)
-				.filter(pr => Addict.omnipresentPrefixes[pr])
-				.forEach(pr => Addict.loadOmnipresentsByPrefix(pr))
-		},
-		
-		loadOmnipresentsByPrefix: prefix => {
-			Addict.omnipresentPrefixes[prefix] = true;
-			
-			moduleNamesWithPrefix(prefix).forEach(Addict.registerOmnipresentPackageName);
-			
-		},
-		
-		dependenciesOf: name => {
-			var deps = dependenciesByName(normalizeName(name));
-			Object.keys(Addict.omnipresentNames).forEach(i => {
-				deps[i] = true;
-				Object.keys(dependenciesByName(i)).forEach(key => deps[key] = true)
-			});
-			Object.keys(deps);
-		},
-		dependencyTreeOf: name => {
-			var deps = dependenciesByName(normalizeName(name))
-			for(var i in deps) deps[i] = Addict.dependencyTreeOf(i);
-			Object.keys(Addict.omnipresentNames).forEach(i => {
-				deps[i] = true;
-				Object.keys(dependenciesByName(i)).forEach(key => deps[key] = true)
-			});
-			return deps;
-		},
-		dependencyListOf: (() => {
-			
-			var keysOf = (tree, res) => {
-				res = res || {};
-				for(var i in tree){
-					res[i] = true;
-					keysOf(tree[i], res);
-				}
-				return res;
+		PackageDiscoverer.prototype = {
+			withHandler: function(handler, cb){
+				this.definitionHandlerStack.push(handler);
+				cb();
+				this.definitionHandlerStack.pop();
 			}
+		}
+		
+		return PackageDiscoverer;
+		
+	})();
+	
+	// искатель пакетов, добывающий код, но не определения пакетов. абстрактен.
+	var RawCodeDiscoverer = (() => {
+		
+		var RawCodeDiscoverer = function(stack, runCode){
+			if(!stack) return this; // for prototype
 			
-			return name => {
-				var deps = keysOf(Addict.dependencyTreeOf(name)), res = [];
-				for(var i in deps) res.push(i);
-				return res;
-			}
-		})(),
-		fileOf: fileOfPackage
-	}
-	
-	var moduleByEnvironment = moduleEnvMap => Addict.require(moduleEnvMap[Addict.environment]);
-	
-	var withEnv = (env, body) => {
-		var oldEnv = Addict.environment;
-		Addict.environment = env;
+			this.runCode = runCode;
+			PackageDiscoverer.call(this, stack);
+		}
 		
-		body();
+		RawCodeDiscoverer.prototype = new PackageDiscoverer();
 		
-		Addict.environment = oldEnv;
-	}
+		var proto = {
+			
+		}
+		
+		Object.keys(proto).forEach(key => RawCodeDiscoverer.prototype[key] = proto[key]);
+		
+	})();
 	
-	Addict.moduleByEnvironment = moduleByEnvironment;
-	Addict.withEnvironment = withEnv;
+	// искатель пакетов по файловой системе
+	var FsPackageDiscoverer = (() => {
+		
+		var FsPackageDiscoverer = function(){
+			this.roots = {};
+		}
+		
+		FsPackageDiscoverer.prototype = {
+			addDirectory: function(path, prefix){ this.roots[path] = prefix || '' },
+			
+		}
+		
+		return FsPackageDiscoverer;
+		
+	})()
 	
-	Addict.realEnvironment = Addict.environment;
-	
-	return Addict;
-	
-})()
-
-var aPackage = Addict.package,
-	aRequire = Addict.require;
-	
-if(Addict.environment === 'node'){
-	module.exports = Addict;
-	global.aPackage = aPackage;
-	global.aRequire = aRequire;
-}
-
-Addict.global = typeof self === "undefined" ? typeof global === "undefined" ? this : global : self;
-
-aPackage('nart.meta.addict', () => Addict);
+})();
