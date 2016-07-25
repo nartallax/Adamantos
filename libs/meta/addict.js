@@ -114,20 +114,41 @@ var Addict = (() => {
 		
 		var PackageResolver = function(pkg, getPkg){
 			this.pkg = pkg;
-			this.getPackage = name => {
-				var pkg = getPkg(name);
+			this.getPackage = getPkg;
+		}
+		
+		PackageResolver.prototype = {
+			toString: function(){ return 'resolver(' + this.pkg + ')' },
+			getProduct: function(name){
+				var pkg = this.getPackage(name);
 				this.pkg.addDependency(pkg);
 				return pkg.product;
 			}
 		}
 		
-		PackageResolver.prototype = {
-			toString: function(){ return 'resolver(' + this.pkg + ')' }
-		}
-		
 		return PackageResolver;
 		
 	});
+	
+	// специальный резолвер пакетов
+	// используется в случае, когда "текущий исполняющийся пакет" - не вполне обычен
+	// например, в случае, когда зависимость запрашивается не каким-то определенным пакетом, а из main-а, или в качестве omnipresent-а
+	var SpecialPackageResolver = (() => {
+		
+		var SpecialPackageResolver = deriveClassFrom(PackageResolver, function(getPkg, name){
+			this.name = name;
+			this.dependencies = [];
+			PackageResolver.call(this, null, getPkg)
+		}, {
+			toString: function(){ return 'specialResolver(' + this.name + ')' },
+			getProduct: function(name){ 
+				var pkg = this.getPackage(name);
+				this.dependencies.push(pkg);
+				return pkg.product
+			}
+		})
+		
+	})();
 	
 	// словарь пакетов
 	// ответственнен за хранение пакетов, а также за их исполнение и назначение им зависимостей
@@ -151,11 +172,37 @@ var Addict = (() => {
 		
 		PackageDictionary.prototype = {
 			fail: function(message){ throw new Error(message + '\nPackage requisition stack:\n' + this.resolverStack) },
+			
+			withRoot: function(name){
+				if(!this.resolverStack.isEmpty()){
+					this.fail([
+						'Failed to create root package "' + name + '": you can\'t create root package on top of other package.',
+						'If you need to create a root, you should do it after package is defined, not at definition time.',
+					].join('\n\t'));
+				}
+				this.resolverStack.push(new SpecialPackageResolver(name => this.getExecutedPackage(name), name))
+			},
+			
+			getProduct: function(name){
+				if(this.resolverStack.isEmpty()){
+					this.fail([
+						'Failed to get product of package ' + name + ': no resolvers registered.',
+						'Maybe you tried to request a package asynchronously?',
+						'You should do it other way (if you REALLY want this and understand the consequences).'
+					].join('\n\t'));
+				}
+				
+				return this.resolverStack.peek().getProduct(name);
+			},
+			
+			getDependencies: function(name){ return this.getExecutedPackage(name).dependencies },
+			
 			definePackage: function(name, definition){ 
 				name in this.packages && this.fail('Duplicate definition of package ' + name);
 				this.packages[name] = new Package(name, definition, msg => this.fail(msg)) 
 			},
 			
+			// private
 			getPackage: function(name){
 				if(name in this.packages) return this.packages[name];
 				this.discoverByName(name, (name, def) => this.definePackage(name, def));
@@ -165,10 +212,7 @@ var Addict = (() => {
 			
 			getExecutedPackage: function(name){
 				var pkg = this.getPackage(name);
-				if(!pkg.isExecuted){
-					this.beforeExecutionHandlers.forEach(handler => handler(pkg));
-					this.executePackage(pkg);
-				}
+				pkg.isExecuted || this.executePackage(pkg);
 				return pkg;
 			},
 		
@@ -181,10 +225,7 @@ var Addict = (() => {
 				this.resolverStack.push(new PackageResolver(pkg, name => this.getExecutedPackage(name)));
 				pkg.executeDefinition();
 				this.resolverStack.pop();
-			},
-			
-			getProduct: function(name){ return this.getExecutedPackage(name).product },
-			getDependencies: function(name){ return this.getExecutedPackage(name).dependencies },
+			}
 		}
 	
 		return PackageDictionary;
@@ -192,34 +233,33 @@ var Addict = (() => {
 	})();
 	
 	// словарь, умеющий учитывать omnipresent-ы
-	// базируется на другом словаре
+	// подгружает omnipresent-ы каждое определение root-а
+	// конечно, можно было бы запретить определять омнипрезенты после первого определения рута
+	// но тогда было бы сильно сложнее реализовывать сценарий модулей
+	// которые подгружаются уже после старта основной программы и могут определять свои омнипрезенты
+	// так что запретим определение омнипрезентов только в definition-time
 	var OmnipresentDictionary = (() => {
 		
-		var OmnipresentDictionary = function(baseDictionary, discoverByPrefix){
-			this.base = baseDictionary;
+		var OmnipresentDictionary = deriveClassFrom(PackageDictionary, function(discoverByName, discoverByPrefix){
+			PackageDictionary.call(this, discoverByName);
+			
 			this.discoverByPrefix = discoverByPrefix;
 			this.omnipresents = {};
-			this.omnipresentsAreModifiedSinceLastExecution = false;
-			
 			this.prefixes = [];
 			
-			this.base.beforeExecutionHandlers.push(pkg => {
-				if(!this.omnipresentsAreModifiedSinceLastExecution){
-					return;
+			this.omnipresentsAreModifiedSinceLastRootDefinition = false;
+			TODO FINISH HIM
+			//Object.keys(this.omnipresents).forEach(name => this.getProduct(name))
+		}, {
+			registerPrefix: function(prefix){
+				if(!this.resolverStack.isEmpty()){
+					this.fail('Failed to define omnipresent prefix: all omnipresents should be defined before root definition, not at definition time.');
 				}
 				
-				this.omnipresentsAreModifiedSinceLastExecution = false;
-				
-				Object.keys(this.omnipresents).forEach(name => this.base.getProduct(name))
-			})
-		}
-		
-		OmnipresentDictionary.prototype = {
-			registerPrefix: function(prefix){
 				this.prefixes.push(prefix);
 				
 				discoverByPrefix(prefix, (name, def) => {
-					this.base.definePackage(name, def)
+					this.definePackage(name, def)
 					this.registerPackage(name);
 				});
 			},
@@ -228,13 +268,14 @@ var Addict = (() => {
 			
 			//private
 			registerPackage: function(name){
+				this.omnipresentsAreModifiedSinceLastExecution = true;
 				this.omnipresents[name] = true;
 				this.base.getPackage(name).attributes.isOmnipresent = true;
 				this.base.getDependencies(name).forEach(pkg => this.registerPackage(pkg.name));
 			},
 			
 			getOmnipresents: function(){ return Object.keys(this.omnipresents) }
-		}
+		})
 		
 		return OmnipresentDictionary;
 		
