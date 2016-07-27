@@ -32,6 +32,7 @@ var Addict = (() => {
 	var splitPrefix = prefix => splitName(prefix.replace(/\.$/, ''))
 	
 	
+	
 	// просто структура данных, без какой-либо специализации
 	var Stack = (() => {
 		
@@ -95,7 +96,7 @@ var Addict = (() => {
 		
 		Package.prototype = {
 			executeDefinitionOnce: function(){
-				this.isExecuted || this.executeDefinition;
+				this.isExecuted || this.executeDefinition();
 			},
 			executeDefinition: function(){
 				this.isExecuted && this.fail('Duplicate execution of package ' + this.name);
@@ -110,6 +111,170 @@ var Addict = (() => {
 		return Package;
 		
 	})();
+	
+	// тоже пакет, но хранящийся не в нашей системе зависимостей
+	// например, commonJS
+	var ExternalPackage = (() => {
+		
+		var ExternalPackage = deriveClassFrom(Package, function(name, fail){
+			Package.call(this, name, null, fail);
+		}, {
+			TODO proceed here
+		});
+		
+		return ExternalPackage;
+		
+	})();
+	
+	// некоторый хитрый объект, умеющий изменять код пакетов и исполнять этот код
+	// например, дописывать "use strict" в начало определения
+	// также возможны разного рода макрозамены
+	var CodeManipulator = (() => {
+		
+		var CodeManipulator = function(fail, exceptionCodeLength){
+			this.fail = fail;
+			this.exceptionCodeLength = exceptionCodeLength || 150;
+			this.fixAndRun = code => this.fixAndRunCode(code);
+		}
+		
+		var fullPackageHeaderRegexp = /^.*?(?:[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]\s*\(.*?\)\s*\{|=>\s*\{)/,
+			unfullPackageRegexp = /^(.*?=>)(.*?)(\)[\s\n\r]*)$/;
+		
+		CodeManipulator.prototype = {
+			failWithCode: function(msg, code){
+				code = code.length > this.exceptionCodeLength? code.substr(0, exceptionCodeLength - 3) + '...': code;
+				this.fail(msg + '\nCode: ' + code);
+			},
+			
+			fixCode: function(code){ return this.ensureStrictMode(code) },
+			
+			ensureStrictMode: function(code){
+				var header = (code.match(fullPackageHeaderRegexp) || [])[0];
+				if(header){
+					return header + '"use strict"; ' + code.replace(fullPackageHeaderRegexp, '')
+				} else {
+					var parts = code.match(unfullPackageRegexp);
+					if(!parts) this.failWithCode('Failed to parse package code.', code)
+					
+					return parts[1] + '{"use strict"; return ' + parts[2] + '}' + parts[3];
+				}
+			},
+			
+			// TODO: think about other options, such as new Function(code); maybe they will be worth it
+			runCode: function(code){ return eval(code) },
+			
+			fixAndRunCode: function(code){ return this.runCode(this.fixCode(code)) }
+		}
+		
+		return CodeManipulator;
+		
+	})();
+	
+	// описание среды, в которой исполняется данный скрипт
+	var Environment = (() => {
+		
+		var Environment = function(type, name, version, platform){
+			this.type = (type || '').trim().toLowerCase();
+			this.name = (name || '').trim();
+			this.version = (version || '').trim().replace(/^v/, '').replace(/(^[\s\.]+|[\s\.]+$)/, '');
+			this.platform = (platform || '').trim();
+		}
+		
+		Environment.prototype = {
+			toString: function(){ 
+				return (this.name? '': this.type)
+					+ (this.name? this.name: '') 
+					+ (this.version? ' v' + this.version: '')
+					+ (this.platform? ' on ' + this.platform: '')
+			},
+			
+			withType: function(type){ return new Environment(type, this.name, this.version, this.platform) },
+			withName: function(name){ return new Environment(this.type, name, this.version, this.platform) },
+			withVersion: function(version){ return new Environment(this.type, this.name, version, this.platform) },
+			withPlatform: function(platform){ return new Environment(this.type, this.name, this.version, platform) }
+		}
+		
+		
+		var parseUserAgentPairs = (() => {
+			
+			var parsePair = str => {
+				var parts = str.trim().match(/^(.*?)(?:[\\\/\s]+(\d.*?))?$/)
+				return parts? { name: (parts[1] || '').trim(), version: (parts[2] || '').trim() }: null;
+			}
+			
+			var parseParenthesed = (str, result) => {
+				result = result || [];
+				
+				(str.match(/\(.*?\)/g) || [])
+					.forEach(parCont => parCont
+						.replace(/[\(\)]/g, '')
+						.split(';')
+						.map(parsePair)
+						.filter(p => p)
+						.forEach(pair => result.push(pair))
+					)
+					
+				return result;
+			}
+			
+			var parseUnparenthesed = (str, result) => {
+				result = result || [];
+				
+				(str.replace(/\(.*?\)/g, ' ').match(/\s*(.+?)(?:[\\\/\s]+([\d\.]+))/g) || [])
+					.map(parsePair)
+					.filter(p => p)
+					.forEach(pair => result.push(pair));
+					
+				return result;
+			}
+			
+			var uaPriority = ua => ((ua = ua.toLowerCase()), (ua in browserPriority? browserPriority[ua]: 0))
+			
+			var parseUA = str => parseUnparenthesed(str, parseParenthesed(str))
+				.sort((a, b) => ((a = uaPriority(a.name)), (b = uaPriority(b.name)), a > b? -1: a < b? 1: 0));
+			
+			return parseUA;
+			
+		})();
+		Environment.detectIfInBrowser = () => typeof(window) !== 'undefined';
+		Environment.getCurrentBrowserEnvironment = () => {
+			if(typeof(window.navigator) === 'undefined') return new Environment('browser');
+			
+			var uaPair = window.navigator.userAgent? parseUserAgentPairs(window.navigator.userAgent)[0] || null: null;
+			
+			uaPair = uaPair || { 
+				name: window.navigator.appCodeName || '', 
+				version: (((window.navigator.appVersion || '').match(/^\s*[\d\.]+/) || [])[0] || '')
+			};
+			
+			return new Environment('browser', uaPair.name, uaPair.version, window.navigator.platform);
+		}
+		Environment.getCurrentNodeEnvironment = () => new Environment('node', 'Node.JS', process.version, require('os').platform());
+		Environment.getCurrent = () => Environment.detectIfInBrowser()? 
+			Environment.getCurrentBrowserEnvironment():
+			Environment.getCurrentNodeEnvironment();
+		
+		// браузеры, не вошедшие в этот список, не будут выкинуты
+		// на самом деле, этот список нужен затем, чтобы определять наиболее вероятный браузер
+		// т.к. иногда браузеры выдают большой список пар имя-версия в user-agent
+		// и по-другому невозможно понять, какую же из этих пар в действительности следует взять
+		Environment.knownBrowsers = [
+			"Chrome", "Trident", "MSIE", "Firefox", "Edge", "Internet Explorer", "Iron", "Maxthon", "Opera", "Safari", "Konqueror", "Mozilla", "Netscape"
+		]
+		
+		var browserPriority = (() => {
+			var result = {}, index = Environment.knownBrowsers.length;
+			
+			Environment.knownBrowsers.forEach(name => result[name.toLowerCase()] = index--)
+			
+			return result;
+		})();
+		
+		return Environment;
+		
+	})();
+	
+	
 	
 	// класс, умеющий доставать откуда-то пакеты
 	// привязана к конкретному пакету
@@ -182,6 +347,8 @@ var Addict = (() => {
 		return RootResolver;
 		
 	})();
+	
+	
 	
 	// словарь пакетов
 	// ответственнен за хранение пакетов, а также за их исполнение и назначение им зависимостей
@@ -331,42 +498,7 @@ var Addict = (() => {
 		
 	})();
 	
-	// некоторый хитрый объект, умеющий изменять код пакетов и исполнять этот код
-	// например, дописывать "use strict" в начало определения
-	// также возможны разного рода макрозамены
-	var CodeManipulator = (() => {
-		
-		var CodeManipulator = function(fail, exceptionCodeLength){
-			this.fail = fail;
-			this.exceptionCodeLength = exceptionCodeLength || 150;
-			this.fixAndRun = code => this.fixAndRunCode(code);
-		}
-		
-		CodeManipulator.prototype = {
-			packageHeaderRegexp: /^.*?(?:[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]\s*\(.*?\)\s*\{|=>(?:\s*\{)?)/,
-			
-			failWithCode: function(msg, code){
-				code = code.length > this.exceptionCodeLength? code.substr(0, exceptionCodeLength - 3) + '...': code;
-				this.fail(msg + '\nCode: ' + code);
-			},
-			
-			fixCode: function(code){ return this.ensureStrictMode(code) },
-			
-			ensureStrictMode: function(code){
-				var header = (code.match(packageHeaderRegexp) || [])[0];
-				header || this.failWithCode('Failed to extract header from package code.', code);
-				return header + '"use strict";' + code.replace(this.packageHeaderRegexp, '')
-			},
-			
-			// TODO: think about other options, such as new Function(code); maybe they will be worth it
-			runCode: function(code){ return eval(code) },
-			
-			fixAndRunCode: function(code){ return this.runCode(this.fixCode(code)) }
-		}
-		
-		return CodeManipulator;
-		
-	})();
+	
 	
 	// искатель пакетов. знает, откуда их брать. абстрактен.
 	// опирается на стек обработчиков определения пакета
@@ -541,109 +673,7 @@ var Addict = (() => {
 		
 	})();
 	
-	// описание среды, в которой исполняется данный скрипт
-	var Environment = (() => {
-		
-		var Environment = function(type, name, version, platform){
-			this.type = (type || '').trim().toLowerCase();
-			this.name = (name || '').trim();
-			this.version = (version || '').trim().replace(/^v/, '').replace(/(^[\s\.]+|[\s\.]+$)/, '');
-			this.platform = (platform || '').trim();
-		}
-		
-		Environment.prototype = {
-			toString: function(){ 
-				return (this.name? '': this.type)
-					+ (this.name? this.name: '') 
-					+ (this.version? ' v' + this.version: '')
-					+ (this.platform? ' on ' + this.platform: '')
-			},
-			
-			withType: function(type){ return new Environment(type, this.name, this.version, this.platform) },
-			withName: function(name){ return new Environment(this.type, name, this.version, this.platform) },
-			withVersion: function(version){ return new Environment(this.type, this.name, version, this.platform) },
-			withPlatform: function(platform){ return new Environment(this.type, this.name, this.version, platform) }
-		}
-		
-		
-		var parseUserAgentPairs = (() => {
-			
-			var parsePair = str => {
-				var parts = str.trim().match(/^(.*?)(?:[\\\/\s]+(\d.*?))?$/)
-				return parts? { name: (parts[1] || '').trim(), version: (parts[2] || '').trim() }: null;
-			}
-			
-			var parseParenthesed = (str, result) => {
-				result = result || [];
-				
-				(str.match(/\(.*?\)/g) || [])
-					.forEach(parCont => parCont
-						.replace(/[\(\)]/g, '')
-						.split(';')
-						.map(parsePair)
-						.filter(p => p)
-						.forEach(pair => result.push(pair))
-					)
-					
-				return result;
-			}
-			
-			var parseUnparenthesed = (str, result) => {
-				result = result || [];
-				
-				(str.replace(/\(.*?\)/g, ' ').match(/\s*(.+?)(?:[\\\/\s]+([\d\.]+))/g) || [])
-					.map(parsePair)
-					.filter(p => p)
-					.forEach(pair => result.push(pair));
-					
-				return result;
-			}
-			
-			var uaPriority = ua => ((ua = ua.toLowerCase()), (ua in browserPriority? browserPriority[ua]: 0))
-			
-			var parseUA = str => parseUnparenthesed(str, parseParenthesed(str))
-				.sort((a, b) => ((a = uaPriority(a.name)), (b = uaPriority(b.name)), a > b? -1: a < b? 1: 0));
-			
-			return parseUA;
-			
-		})();
-		Environment.detectIfInBrowser = () => typeof(window) !== 'undefined';
-		Environment.getCurrentBrowserEnvironment = () => {
-			if(typeof(window.navigator) === 'undefined') return new Environment('browser');
-			
-			var uaPair = window.navigator.userAgent? parseUserAgentPairs(window.navigator.userAgent)[0] || null: null;
-			
-			uaPair = uaPair || { 
-				name: window.navigator.appCodeName || '', 
-				version: (((window.navigator.appVersion || '').match(/^\s*[\d\.]+/) || [])[0] || '')
-			};
-			
-			return new Environment('browser', uaPair.name, uaPair.version, window.navigator.platform);
-		}
-		Environment.getCurrentNodeEnvironment = () => new Environment('node', 'Node.JS', process.version, require('os').platform());
-		Environment.getCurrent = () => Environment.detectIfInBrowser()? 
-			Environment.getCurrentBrowserEnvironment():
-			Environment.getCurrentNodeEnvironment();
-		
-		// браузеры, не вошедшие в этот список, не будут выкинуты
-		// на самом деле, этот список нужен затем, чтобы определять наиболее вероятный браузер
-		// т.к. иногда браузеры выдают большой список пар имя-версия в user-agent
-		// и по-другому невозможно понять, какую же из этих пар в действительности следует взять
-		Environment.knownBrowsers = [
-			"Chrome", "Trident", "MSIE", "Firefox", "Edge", "Internet Explorer", "Iron", "Maxthon", "Opera", "Safari", "Konqueror", "Mozilla", "Netscape"
-		]
-		
-		var browserPriority = (() => {
-			var result = {}, index = Environment.knownBrowsers.length;
-			
-			Environment.knownBrowsers.forEach(name => result[name.toLowerCase()] = index--)
-			
-			return result;
-		})();
-		
-		return Environment;
-		
-	})();
+	
 	
 	// собственно система управления	
 	var Addict = (() => {
@@ -658,11 +688,18 @@ var Addict = (() => {
 			this.codeManipulator = new CodeManipulator(fail);
 			this.discoverer = this.createDiscoverer();
 			
-			this.setDictionaries();
+			this.setDictionary();
 		}
 		
 		Addict.prototype = {
 			Environment: Environment,
+			
+			// require для взаимодействия с commonJS
+			requireCommonJS: function(name){
+				if(typeof(require) !== 'undefined' && require.main && typeof(require.main.require) === 'function'){
+					return require(')
+				}
+			},
 			
 			// получить результат исполнения функции-определения пакета
 			// если в данный момент не исполняется ни одного пакета, метод потерпит неудачу
@@ -681,7 +718,6 @@ var Addict = (() => {
 				
 				this.packageDefinitionHandlerStack.peek()(name, definition);
 			},
-			TODO LEARN WHY REAL_ENV WAS STORED SEPARATELY IN PREVIOUS VERSION
 			TODO MORE METHODS!!!
 			TODO TAKE CARE OF require('something')
 			// позволяет подменять среду исполнения на произвольную
