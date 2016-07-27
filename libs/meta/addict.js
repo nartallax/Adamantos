@@ -94,10 +94,14 @@ var Addict = (() => {
 		}
 		
 		Package.prototype = {
+			executeDefinitionOnce: function(){
+				this.isExecuted || this.executeDefinition;
+			},
 			executeDefinition: function(){
 				this.isExecuted && this.fail('Duplicate execution of package ' + this.name);
 				this.product = this.definition.call(null);
 				this.product || this.isOmnipresent || this.fail('Failed to execute a package ' + this.name + ': no valuable result received.');
+				this.isExecuted = true;
 			},
 			addDependency: function(name){ this.dependencies.push(name) },
 			toString: function(){ return 'package(' + this.name + ')' }
@@ -112,9 +116,10 @@ var Addict = (() => {
 	// все пакеты, запрошенные у этого класса, считаются зависимостями этого пакета
 	var PackageResolver = (() => {
 		
-		var PackageResolver = function(pkg, getPkg){
+		var PackageResolver = function(pkg, getPkg, executePkg){
 			this.pkg = pkg;
 			this.getPackage = getPkg;
+			this.executePackage = executePkg;
 		}
 		
 		PackageResolver.prototype = {
@@ -122,31 +127,59 @@ var Addict = (() => {
 			getProduct: function(name){
 				var pkg = this.getPackage(name);
 				this.pkg.addDependency(pkg);
+				this.executePackage(pkg);
 				return pkg.product;
-			}
+			},
+			
+			deriveResolver: function(pkg){ return new PackageResolver(pkg, getPkg) }
 		}
 		
 		return PackageResolver;
 		
 	});
 	
-	// специальный резолвер пакетов
-	// используется в случае, когда "текущий исполняющийся пакет" - не вполне обычен
-	// например, в случае, когда зависимость запрашивается не каким-то определенным пакетом, а из main-а, или в качестве omnipresent-а
-	var SpecialPackageResolver = (() => {
+	// резолвер омнипрезентов
+	// прежде чем резолвнуть пакет - выставляет ему атрибут omnipresent, чтобы он нормально резолвнулся
+	// наследуется; т.к. любой пакет, от которого зависит омнипрезент, сам становится омнипрезентом
+	var OmnipresentResolver = (() => {
 		
-		var SpecialPackageResolver = deriveClassFrom(PackageResolver, function(getPkg, name){
-			this.name = name;
-			this.dependencies = [];
-			PackageResolver.call(this, null, getPkg)
+		var OmnipresentResolver = deriveClassFrom(PackageResolver, function(pkg, getPkg, execPkg){
+			pkg.attributes.isOmnipresent = true;
+			PackageResolver.call(this, pkg, getPkg, execPkg)
 		}, {
-			toString: function(){ return 'specialResolver(' + this.name + ')' },
-			getProduct: function(name){ 
-				var pkg = this.getPackage(name);
-				this.dependencies.push(pkg);
-				return pkg.product
+			toString: function(){ return 'omnipresentResolver(' + this.pkg.name + ')' },
+			getProduct: function(name){
+				var newPkg = this.getPackage(name);
+				newPkg.attributes.isOmnipresent = true;
+				this.pkg && this.pkg.addDependency(newPkg);
+				this.executePackage(newPkh)
+				return newPkg.product;
+			},
+			
+			deriveResolver: function(pkg){ return new OmnipresentResolver(pkg, this.getPackage, this.executePackage) }
+			
+		});
+		
+	})();
+	
+	// резолвер для рутового пакета (он же main)
+	// используется, когда имени у пакета нет, а определение - есть, т.е. как раз для main-а
+	var RootResolver = (() => {
+		
+		var RootResolver = deriveClassFrom(PackageResolver, function(getPkg, execPkg){
+			this.dependencies = [];
+			PackageResolver.call(this, null, getPkg, execPkg)
+		}, {
+			toString: function(){ return 'rootResolver(' + this.name + ')' },
+			getProduct: function(name){
+				var newPkg = this.getPackage(name);
+				this.dependencies.push(newPkg)
+				this.executePackage(newPkg);
+				return newPkg.product;
 			}
 		})
+		
+		return RootResolver;
 		
 	})();
 	
@@ -173,14 +206,15 @@ var Addict = (() => {
 		PackageDictionary.prototype = {
 			fail: function(message){ throw new Error(message + '\nPackage requisition stack:\n' + this.resolverStack) },
 			
-			withRoot: function(name){
-				if(!this.resolverStack.isEmpty()){
-					this.fail([
-						'Failed to create root package "' + name + '": you can\'t create root package on top of other package.',
-						'If you need to create a root, you should do it after package is defined, not at definition time.',
-					].join('\n\t'));
-				}
-				this.resolverStack.push(new SpecialPackageResolver(name => this.getExecutedPackage(name), name))
+			withResolver: function(createResolver, body){
+				this.resolverStack.push(createResolver(
+					name => this.getPackage(name), 
+					pkg => this.executePackage(pkg)
+				));
+				
+				body();
+				
+				this.resolverStack.pop();
 			},
 			
 			getProduct: function(name){
@@ -197,12 +231,12 @@ var Addict = (() => {
 			
 			getDependencies: function(name){ return this.getExecutedPackage(name).dependencies },
 			
+			// private
 			definePackage: function(name, definition){ 
 				name in this.packages && this.fail('Duplicate definition of package ' + name);
 				this.packages[name] = new Package(name, definition, msg => this.fail(msg)) 
 			},
 			
-			// private
 			getPackage: function(name){
 				if(name in this.packages) return this.packages[name];
 				this.discoverByName(name, (name, def) => this.definePackage(name, def));
@@ -222,9 +256,11 @@ var Addict = (() => {
 					this.fail('Circular dependency found! Don\'t know how to resolve.\n\t' + circle.map(res => res.package.name).join('\n\t<-') + '\n')
 				}
 				
-				this.resolverStack.push(new PackageResolver(pkg, name => this.getExecutedPackage(name)));
-				pkg.executeDefinition();
-				this.resolverStack.pop();
+				if(this.resolverStack.isEmpty()){
+					this.fail('Unable to execute a package: no resolver to derive from.');
+				}
+				
+				this.withResolver(() => this.resolverStack.peek().deriveResolver(pkg), () => pkg.executeDefinitionOnce());
 			}
 		}
 	
@@ -247,11 +283,17 @@ var Addict = (() => {
 			this.omnipresents = {};
 			this.prefixes = [];
 			
-			this.omnipresentsAreModifiedSinceLastRootDefinition = false;
-			TODO FINISH HIM
 			//Object.keys(this.omnipresents).forEach(name => this.getProduct(name))
+			
 		}, {
-			registerPrefix: function(prefix){
+			withClearOmnipresentList: function(body){
+				var oldPrefs = this.prefixes, oldMap = this.omnipresents;
+				(this.omnipresents = {}), (this.prefixes = []);
+				body();
+				(this.omnipresents = oldMap), (this.prefixes = oldPrefs);
+			},
+			
+			registerOmnipresentPrefix: function(prefix){
 				if(!this.resolverStack.isEmpty()){
 					this.fail('Failed to define omnipresent prefix: all omnipresents should be defined before root definition, not at definition time.');
 				}
@@ -260,18 +302,26 @@ var Addict = (() => {
 				
 				discoverByPrefix(prefix, (name, def) => {
 					this.definePackage(name, def)
-					this.registerPackage(name);
+					this.registerOmnipresentPackageByName(name);
 				});
 			},
 			
-			getRegisterPrefixes: function(){ return this.prefixes; },
+			getOmnipresentPrefixes: function(){ return this.prefixes; },
 			
 			//private
-			registerPackage: function(name){
-				this.omnipresentsAreModifiedSinceLastExecution = true;
-				this.omnipresents[name] = true;
-				this.base.getPackage(name).attributes.isOmnipresent = true;
-				this.base.getDependencies(name).forEach(pkg => this.registerPackage(pkg.name));
+			registerOmnipresentPackageByName: function(name){
+				this.registerOmnipresentPackage(this.getPackage(name));
+			},
+			
+			registerOmnipresentPackage: function(pkg){
+				if(pkg.name in this.omnipresents) return; // already defined, no need to define again
+				this.omnipresents[pkg.name] = true;
+				this.withResolver((getPkg, execPkg) => new OmnipresentResolver(pkg, getPkg, execPkg), () => pkg.executeDefinitionOnce())
+				
+				// теоретически, к этому моменту все его зависимости уже определились
+				// но регистрировать их как омнипрезенты все равно нужно
+				// например, на тот случай, если сначала пакет запрошен в качестве обычного, а затем - как омнипрезент
+				this.getDependencies(name).forEach(pkg => this.registerOmnipresentPackage(pkg));
 			},
 			
 			getOmnipresents: function(){ return Object.keys(this.omnipresents) }
@@ -612,16 +662,31 @@ var Addict = (() => {
 		}
 		
 		Addict.prototype = {
+			Environment: Environment,
+			
+			// получить результат исполнения функции-определения пакета
+			// если в данный момент не исполняется ни одного пакета, метод потерпит неудачу
+			// это нужно для предотвращения асинхронного запроса зависимостей
+			// что, в свою очередь, нужно для того, чтобы иметь возможность строить граф зависимостей
+			getPackage: function(name){ this.dictionary.getProduct(name) },
+			
+			// определить пакет
+			// пакет может быть определен только при нахождении его по запросу какого-либо другого пакета
+			// так что, как и в случае с getPackage, потерпит неудачу при асинхронном определении
 			definePackage: function(name, definition){
 				if(this.packageDefinitionHandlerStack.isEmpty()){
 					this.fail('Could not add definition of package ' + name + ': no definition handler.'
 						+ '\nDon\'t try to force-define packages. Package should be defined only at point it is required first time.');
 				}
+				
+				this.packageDefinitionHandlerStack.peek()(name, definition);
 			},
-			
-			getPackage: function(){
-			},
-			
+			TODO LEARN WHY REAL_ENV WAS STORED SEPARATELY IN PREVIOUS VERSION
+			TODO MORE METHODS!!!
+			TODO TAKE CARE OF require('something')
+			// позволяет подменять среду исполнения на произвольную
+			// в реальности это, конечно, ничего не изменит - реальная среда останется прежней
+			// но пакеты, полагающиеся на значение среды, могут работать по-другому
 			withEnvironment: function(newEnv, body){
 				var oldEnv = this.environment;
 				this.environment = newEnv;
@@ -629,17 +694,22 @@ var Addict = (() => {
 				this.environment = oldEnv;
 			},
 			
+			// этот метод не откатывает действие омнипрезентов
+			// (их, скорее всего, может откатить только полный перезапуск)
+			// а просто очищает их список, как если бы ни одного префикса не было задано
+			withClearOmnipresentList: function(body){ this.dictionary.withClearOmnipresentList(body) },
+			
+			// этот метод заставляет систему думать, что ни один пакет в ней не определен
+			// т.о. определения всех пакетов будут исполнены заново
+			// если при вызове этого метода список омнипрезентов не пуст, то они будут исполнены немедленно
+			// этот метод может быть полезен при составлении графа зависимостей для другой среды
+			// например, в случае полиморфного пакета, который в разных средах работает через разные АПИ
 			withClearDictionaries: function(body){
-				var oldOmni = this.omnipresentDictionary,
-					oldDict = this.dictionary;
-					
-				this.setDictionaries();
-				
-				oldOmni.getPrefixes().forEach(prefix => this.omnipresentDictionary.addPrefix(prefix));
-					
+				var oldDict = this.dictionary;
+				this.setDictionary();
+				oldDict.getOmnipresentPrefixes().forEach(prefix => this.dictionary.registerOmnipresentPrefix(prefix));
 				body();
-				
-				this.setDictionaries(oldDict, oldOmni);
+				this.setDictionary(oldDict);
 			},
 			
 			// private 
@@ -667,9 +737,11 @@ var Addict = (() => {
 				}
 			},
 			
-			setDictionaries: function(omni, dict){				
-				this.dictionary = dict || new PackageDictionary(name => this.discoverer.discoverByName(name));
-				this.omnipresentDictionary = omni || new OmnipresentDictionary(this.dictionary, prefix => this.discoverer.discoverByPrefix(prefix));
+			setDictionary: function(dict){				
+				this.dictionary = dict || new OmnipresentDictionary(
+					name => this.discoverer.discoverByName(name),
+					prefix => this.discoverer.discoverByPrefix(prefix)
+				);
 			}
 		};
 		
