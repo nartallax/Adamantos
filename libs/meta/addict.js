@@ -112,20 +112,6 @@ var Addict = (() => {
 		
 	})();
 	
-	// тоже пакет, но хранящийся не в нашей системе зависимостей
-	// например, commonJS
-	var ExternalPackage = (() => {
-		
-		var ExternalPackage = deriveClassFrom(Package, function(name, fail){
-			Package.call(this, name, null, fail);
-		}, {
-			TODO proceed here
-		});
-		
-		return ExternalPackage;
-		
-	})();
-	
 	// некоторый хитрый объект, умеющий изменять код пакетов и исполнять этот код
 	// например, дописывать "use strict" в начало определения
 	// также возможны разного рода макрозамены
@@ -170,7 +156,7 @@ var Addict = (() => {
 		
 	})();
 	
-	// описание среды, в которой исполняется данный скрипт
+	// описание среды исполнения
 	var Environment = (() => {
 		
 		var Environment = function(type, name, version, platform){
@@ -289,6 +275,7 @@ var Addict = (() => {
 		
 		PackageResolver.prototype = {
 			toString: function(){ return 'resolver(' + this.pkg + ')' },
+			
 			getProduct: function(name){
 				var pkg = this.getPackage(name);
 				this.pkg.addDependency(pkg);
@@ -697,7 +684,7 @@ var Addict = (() => {
 			// require для взаимодействия с commonJS
 			requireCommonJS: function(name){
 				if(typeof(require) !== 'undefined' && require.main && typeof(require.main.require) === 'function'){
-					return require(')
+					return require(name);
 				}
 			},
 			
